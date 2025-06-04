@@ -6,7 +6,7 @@
         <!-- Logo y marca -->
         <div class="brand-section">
           <q-avatar square size="40px" class="brand-logo">
-            <img src="icon.jpeg" alt="Recap AI Logo" />
+            <img src="icon.png" alt="Recap AI Logo" />
           </q-avatar>
           <div class="brand-text">
             <div class="brand-name">Recap AI</div>

@@ -1,79 +1,74 @@
 <template>
   <q-layout>
-    <q-page-sticky position="bottom" :offset="[20, 20]">
-      <div
-        @click="startStopAudioRecording()"
-        v-if="!general.$state.waitingResponse"
-        class="column justify-center items-center"
-      >
-        <q-chip
-          v-if="!general.$state.isRecording"
-          icon="fa-solid fa-play"
-          color="primary"
-          text-color="white"
-          size="lg"
-          >Start recording</q-chip
-        >
-        <q-spinner-bars
-          v-if="general.$state.isRecording"
-          color="primary"
-          size="3em"
-        /><q-chip
-          v-if="general.$state.isRecording"
-          icon="fa-solid fa-stop"
-          color="primary"
-          text-color="white"
-          size="lg"
-          >Stop recording</q-chip
-        >
-      </div>
-      <div
-        v-if="general.$state.waitingResponse"
-        class="column justify-center items-center"
-      >
-        <q-spinner-hourglass color="primary" size="5em" />
-        <p class="text-white">Waiting for a response...</p>
-      </div>
-    </q-page-sticky>
+    <div class="q-pa-md">
+      <RecordingButton
+        ref="recordingButtonRef"
+        @recording-started="onRecordingStarted"
+        @recording-stopped="onRecordingStopped"
+        @recording-error="onRecordingError"
+      />
+    </div>
   </q-layout>
 </template>
 
 <script setup>
 import { ref, onMounted } from "vue";
 import { useGeneralStore } from "src/stores/General";
-// import { GUI } from "lil-gui";
+import RecordingButton from "../components/RecordingButton.vue";
 
 const general = useGeneralStore();
+//@ts-ignore
 import mixin from "../mixins/mixin";
 
 const { showNoty } = mixin();
 
-const startStopAudioRecording = () => {
-  if (general.$state.isRecording) {
-    general.stopAudioRecording();
-  } else {
-    general.startAudioRecording();
+const onRecordingStarted = () => {
+  console.log("Grabación iniciada desde el layout");
+  // Aquí puedes agregar lógica adicional cuando inicie la grabación
+  // Por ejemplo, cambiar el estado global, enviar analytics, etc.
+};
+
+const onRecordingStopped = (audioBlob, duration) => {
+  console.log(`Grabación detenida. Duración: ${duration}`);
+  console.log("Audio blob:", audioBlob);
+
+  // Aquí puedes manejar el archivo de audio:
+  // 1. Crear URL para reproducir
+  const audioUrl = URL.createObjectURL(audioBlob);
+  console.log("Audio URL:", audioUrl);
+
+  // 2. Enviar a tu API
+  uploadAudioToServer(audioBlob, duration);
+
+  // 3. Guardar en el store si es necesario
+  // general.setRecordedAudio(audioBlob);
+};
+
+const onRecordingError = (error) => {
+  console.error("Error en grabación:", error);
+  showNoty(`Error: ${error}`, "negative");
+};
+
+// Función para subir audio al servidor
+const uploadAudioToServer = async (audioBlob, duration) => {
+  try {
+    const formData = new FormData();
+    formData.append("audio", audioBlob, `recording_${Date.now()}.webm`);
+    formData.append("duration", duration);
+
+    // Ejemplo de envío
+    // const response = await fetch('/api/upload-audio', {
+    //   method: 'POST',
+    //   body: formData
+    // });
+
+    console.log("Audio listo para enviar al servidor");
+    showNoty("Audio procesado correctamente", "positive");
+  } catch (error) {
+    console.error("Error al subir audio:", error);
+    showNoty("Error al procesar el audio", "negative");
   }
 };
-
-const endSessionAgent = () => {
-  general.sendMessageWS({
-    action: "endSession",
-    message: "End session agent",
-  });
-  showNoty("success", "The conversation history was removed.");
-};
-
-const threeContainer = ref(null);
-let scene,
-  camera,
-  renderer,
-  controls,
-  ambientLight,
-  directionalLight,
-  mixer,
-  clock,
-  model;
 
 defineOptions({
   name: "IndexPage",
