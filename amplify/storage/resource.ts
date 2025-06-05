@@ -1,8 +1,8 @@
-import { defineStorage } from "@aws-amplify/backend";
+import { defineStorage, defineFunction } from "@aws-amplify/backend";
 
 export const storage = defineStorage({
-  name: "ia-interview-simulator",
+  name: "recap-ai",
   access: (allow) => ({
-    "polly-output/*": [allow.authenticated.to(["read", "write"])],
+    "users-recordings/*": [allow.authenticated.to(["read", "write"])],
   }),
 });

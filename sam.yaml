@@ -1,0 +1,423 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: "Audio Processing Pipeline - Transcription to Summary using Step Functions"
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, staging, prod]
+    Description: Environment name
+
+  AudioBucketName:
+    Type: String
+    Default: audio-processing-uploads
+    Description: S3 bucket for audio file uploads
+
+  NotificationEmail:
+    Type: String
+    Description: Email for processing notifications
+    Default: admin@example.com
+
+Globals:
+  Function:
+    Runtime: python3.9
+    Timeout: 300
+    MemorySize: 4096
+    Environment:
+      Variables:
+        ENVIRONMENT: !Ref Environment
+        AUDIO_BUCKET: !Sub "${AudioBucketName}-${Environment}-${AWS::AccountId}"
+        TRANSCRIPTION_BUCKET: !Sub "${AudioBucketName}-transcriptions-${Environment}-${AWS::AccountId}"
+        DYNAMODB_TABLE: !Ref AudioSummariesTable
+        SNS_TOPIC: !Ref ProcessingNotificationsTopic
+
+Resources:
+  # ==========================================
+  # S3 BUCKETS
+  # ==========================================
+  AudioUploadBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AudioBucketName}-${Environment}-${AWS::AccountId}"
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: TransitionToIA
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 30
+                StorageClass: STANDARD_IA
+          - Id: TransitionToGlacier
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 90
+                StorageClass: GLACIER
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: s3:ObjectCreated:*
+            Function: !GetAtt S3TriggerFunction.Arn
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: suffix
+                    Value: .webm
+
+  TranscriptionBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AudioBucketName}-transcriptions-${Environment}-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # ==========================================
+  # DYNAMODB TABLE
+  # ==========================================
+  AudioSummariesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "AudioSummaries-${Environment}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserIdIndex
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: StatusIndex
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: status
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: AudioProcessing
+
+  # ==========================================
+  # SNS TOPIC
+  # ==========================================
+  ProcessingNotificationsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "audio-processing-notifications-${Environment}"
+      DisplayName: Audio Processing Notifications
+      KmsMasterKeyId: alias/aws/sns
+
+  NotificationSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      TopicArn: !Ref ProcessingNotificationsTopic
+      Endpoint: !Ref NotificationEmail
+
+  # ==========================================
+  # LAMBDA FUNCTIONS
+  # ==========================================
+  S3TriggerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "s3-trigger-stepfunctions-${Environment}"
+      CodeUri: src/s3_trigger/
+      Handler: handler.lambda_handler
+      Environment:
+        Variables:
+          STATE_MACHINE_ARN: !Ref AudioProcessingStateMachine
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - states:StartExecution
+              Resource: !Ref AudioProcessingStateMachine
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: "*"
+
+  S3TriggerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref S3TriggerFunction
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub "${AudioUploadBucket}/*"
+
+  BedrockProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "bedrock-audio-processor-${Environment}"
+      CodeUri: src/bedrock_processor/
+      Handler: handler.lambda_handler
+      Timeout: 900
+      MemorySize: 1024
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-*"
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub "${TranscriptionBucket}/*"
+                - !Sub "${AudioUploadBucket}/*"
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: "*"
+
+  # ==========================================
+  # STEP FUNCTIONS STATE MACHINE
+  # ==========================================
+  AudioProcessingStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Name: !Sub "audio-processing-workflow-${Environment}"
+      DefinitionUri: statemachine/audio_processing.asl.json
+      DefinitionSubstitutions:
+        TranscriptionBucketName: !Ref TranscriptionBucket
+        BedrockProcessorFunctionArn: !GetAtt BedrockProcessorFunction.Arn
+        DynamoDBTableName: !Ref AudioSummariesTable
+        SNSTopicArn: !Ref ProcessingNotificationsTopic
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - transcribe:StartTranscriptionJob
+                - transcribe:GetTranscriptionJob
+                - transcribe:ListTranscriptionJobs
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+              Resource:
+                - !Sub "${AudioUploadBucket}/*"
+                - !Sub "${TranscriptionBucket}/*"
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource: !GetAtt BedrockProcessorFunction.Arn
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:GetItem
+              Resource: !GetAtt AudioSummariesTable.Arn
+            - Effect: Allow
+              Action:
+                - sns:Publish
+              Resource: !Ref ProcessingNotificationsTopic
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: "*"
+
+  # ==========================================
+  # API GATEWAY (Para consultar resultados)
+  # ==========================================
+  AudioProcessingApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub "audio-processing-api-${Environment}"
+      StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+      Auth:
+        DefaultAuthorizer: AWS_IAM
+
+  GetSummariesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "get-audio-summaries-${Environment}"
+      CodeUri: src/api/
+      Handler: get_summaries.lambda_handler
+      Events:
+        GetSummaries:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AudioProcessingApi
+            Path: /summaries/{userId}
+            Method: GET
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:GetItem
+              Resource:
+                - !GetAtt AudioSummariesTable.Arn
+                - !Sub "${AudioSummariesTable.Arn}/index/*"
+
+  GetSummaryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "get-audio-summary-${Environment}"
+      CodeUri: src/api/
+      Handler: get_summary.lambda_handler
+      Events:
+        GetSummary:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AudioProcessingApi
+            Path: /summary/{summaryId}
+            Method: GET
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+              Resource: !GetAtt AudioSummariesTable.Arn
+
+  # ==========================================
+  # CLOUDWATCH DASHBOARDS Y ALERTAS
+  # ==========================================
+  ProcessingDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub "AudioProcessing-${Environment}"
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  ["AWS/States", "ExecutionsSucceeded", "StateMachineArn", "${AudioProcessingStateMachine}"],
+                  [".", "ExecutionsFailed", ".", "."],
+                  [".", "ExecutionsStarted", ".", "."]
+                ],
+                "period": 300,
+                "stat": "Sum",
+                "region": "${AWS::Region}",
+                "title": "Step Functions Executions"
+              }
+            },
+            {
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  ["AWS/Lambda", "Duration", "FunctionName", "${BedrockProcessorFunction}"],
+                  [".", "Errors", ".", "."],
+                  [".", "Invocations", ".", "."]
+                ],
+                "period": 300,
+                "stat": "Average",
+                "region": "${AWS::Region}",
+                "title": "Bedrock Processor Function"
+              }
+            }
+          ]
+        }
+
+  FailedExecutionsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "AudioProcessing-FailedExecutions-${Environment}"
+      AlarmDescription: "Alert when Step Functions executions fail"
+      MetricName: ExecutionsFailed
+      Namespace: AWS/States
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: StateMachineArn
+          Value: !Ref AudioProcessingStateMachine
+      AlarmActions:
+        - !Ref ProcessingNotificationsTopic
+
+  # ==========================================
+  # OUTPUTS
+  # ==========================================
+Outputs:
+  AudioBucketName:
+    Description: "S3 Bucket for audio uploads"
+    Value: !Ref AudioUploadBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-AudioBucket"
+
+  TranscriptionBucketName:
+    Description: "S3 Bucket for transcriptions"
+    Value: !Ref TranscriptionBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-TranscriptionBucket"
+
+  StateMachineArn:
+    Description: "Step Functions State Machine ARN"
+    Value: !Ref AudioProcessingStateMachine
+    Export:
+      Name: !Sub "${AWS::StackName}-StateMachine"
+
+  ApiGatewayUrl:
+    Description: "API Gateway URL"
+    Value: !Sub "https://${AudioProcessingApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
+    Export:
+      Name: !Sub "${AWS::StackName}-ApiUrl"
+
+  DynamoDBTableName:
+    Description: "DynamoDB Table Name"
+    Value: !Ref AudioSummariesTable
+    Export:
+      Name: !Sub "${AWS::StackName}-DynamoTable"
+
+  SNSTopicArn:
+    Description: "SNS Topic for notifications"
+    Value: !Ref ProcessingNotificationsTopic
+    Export:
+      Name: !Sub "${AWS::StackName}-SNSTopic"

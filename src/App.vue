@@ -11,6 +11,8 @@ window.process = {
 };
 var exports = {};
 import { Amplify } from "aws-amplify";
+import { generateClient } from "aws-amplify/data";
+import type { Schema } from "../amplify/data/resource";
 //@ts-ignore
 import outputs from "../amplify_outputs.json";
 Amplify.configure(outputs);
@@ -47,7 +49,14 @@ watch(user, (val) => {
   }
 });
 
+const client = generateClient<Schema>();
+
 onBeforeMount(async () => {
+  const sub = client.models.RecordingSummary.onCreate().subscribe({
+    next: (data) => console.log("New Data::::", data),
+    error: (error) => console.warn(error),
+  });
+
   Hub.listen("auth", ({ payload }) => {
     switch (payload.event) {
       case "signedIn":

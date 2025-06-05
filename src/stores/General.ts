@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
-import { getUrl } from "@aws-amplify/storage";
+import { getUrl, uploadData } from "@aws-amplify/storage";
 import axios from "axios";
+
 export const useGeneralStore = defineStore("general", {
   state: () => ({
     webSocketEndpoint: "",
@@ -14,11 +15,17 @@ export const useGeneralStore = defineStore("general", {
     audioUrl: null as any,
     signedURL: null as any,
     waitingResponse: false as boolean,
+    // Nuevos estados para manejo de uploads
+    uploadProgress: 0 as number,
+    isUploading: false as boolean,
+    lastUploadedAudioPath: null as string | null,
   }),
+
   actions: {
     setWebsocketEndpoint(endpoint: string) {
       this.webSocketEndpoint = endpoint;
     },
+
     initSocketClient(token: string) {
       //@ts-ignore
       this.token = token;
@@ -27,6 +34,7 @@ export const useGeneralStore = defineStore("general", {
         `${this.webSocketEndpoint}?idToken=${token}`
       );
     },
+
     sendMessageWS(message: any) {
       this.waitingResponse = true;
       //@ts-ignore
@@ -38,99 +46,95 @@ export const useGeneralStore = defineStore("general", {
         })
       );
     },
-    async startAudioRecording() {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert("Tu navegador no soporta la grabación de audio.");
-        return;
-      }
 
+    async uploadAudioToS3(
+      audioBlob: Blob,
+      userId: string,
+      fileName?: string
+    ): Promise<{
+      success: boolean;
+      path?: string;
+      error?: string;
+    }> {
       try {
-        this.isRecording = true;
-        this.userInput = "";
-        this.speechRecognition =
-          //@ts-ignore
-          window.SpeechRecognition || window.webkitSpeechRecognition;
+        this.isUploading = true;
+        this.uploadProgress = 0;
 
-        if (this.speechRecognition) {
-          //@ts-ignore
-          this.recognition = new this.speechRecognition();
-          //@ts-ignore
-          this.recognition.lang = "es-US";
-          //@ts-ignore
-          this.recognition.continuous = true;
+        // Generar nombre único para el archivo si no se proporciona
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const finalFileName = fileName || `recording-${timestamp}.webm`;
 
-          //@ts-ignore
-          this.recognition.onstart = () => {
-            console.log("Reconocimiento de voz iniciado");
-          };
-          //@ts-ignore
-          this.recognition.onend = (event) => {
-            console.log("AQUI::::::", this.userInput);
-            this.sendMessageWS({
-              action: "userInput",
-              message: this.userInput,
-            });
-          };
+        // Crear path con estructura organizada
+        const audioPath = `users-recordings/${userId}/${new Date().getFullYear()}/${
+          new Date().getMonth() + 1
+        }/${finalFileName}`;
 
-          //@ts-ignore
-          this.recognition.onresult = (event: any) => {
-            const transcript =
-              event.results[event.results.length - 1][0].transcript;
-            this.userInput += ` ${transcript}`;
-          };
+        console.log("Iniciando upload de audio a S3...", {
+          path: audioPath,
+          size: audioBlob.size,
+          type: audioBlob.type,
+        });
 
-          //@ts-ignore
-          this.recognition.onerror = (event: any) => {
-            console.error("Error en el reconocimiento de voz:", event.error);
-          };
-          //@ts-ignore
-          this.recognition.start();
-        } else {
-          console.error(
-            "El reconocimiento de voz no está disponible en este navegador."
-          );
-        }
+        // Subir archivo a S3
+        const result = await uploadData({
+          path: audioPath,
+          data: audioBlob,
+          options: {
+            contentType: audioBlob.type || "audio/webm",
+            onProgress: ({ transferredBytes, totalBytes }) => {
+              if (totalBytes) {
+                this.uploadProgress = Math.round(
+                  (transferredBytes / totalBytes) * 100
+                );
+                console.log(`Upload progress: ${this.uploadProgress}%`);
+              }
+            },
+          },
+        }).result;
+
+        console.log("Audio subido exitosamente:", result.path);
+        this.lastUploadedAudioPath = result.path;
+        return {
+          success: true,
+          path: result.path,
+        };
       } catch (error) {
-        console.error("Error al acceder al micrófono", error);
+        console.error("Error al subir audio a S3:", error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Error desconocido",
+        };
+      } finally {
+        this.isUploading = false;
+        this.uploadProgress = 0;
       }
     },
-    stopAudioRecording() {
-      this.isRecording = false;
-      //@ts-ignore
-      this.recognition.stop();
-      this.recognition = null;
-      console.log("Reconocimiento de voz finalizado:::::", this.userInput);
+
+    // Método para obtener URL firmada de un audio existente
+    async getAudioSignedUrl(
+      path: string,
+      expiresIn: number = 3600
+    ): Promise<string | null> {
+      try {
+        const urlResult = await getUrl({
+          path: path,
+          options: {
+            expiresIn: expiresIn,
+          },
+        });
+        return urlResult.url.toString();
+      } catch (error) {
+        console.error("Error al obtener URL firmada:", error);
+        return null;
+      }
     },
-    async startAudioPlay(path: string) {
-      const signedURL: any = await getUrl({ path });
-      console.log("SIGNED URL:::", signedURL);
 
-      if (!signedURL || !signedURL.url) {
-        throw new Error("La URL firmada es inválida");
-      }
-
-      const response = await axios.get(signedURL.url, {
-        responseType: "blob",
-      });
-
-      if (response.status !== 200) {
-        throw new Error("Error al descargar el archivo de audio");
-      }
-
-      const blob = response.data;
-
-      this.audioUrl = URL.createObjectURL(blob);
-
-      const audio = new Audio(this.audioUrl);
-
-      audio.onerror = (event) => {
-        console.error("Error al cargar el audio:", event);
-      };
-
-      await audio.play();
-      URL.revokeObjectURL(this.audioUrl);
-      this.audioUrl = null;
-      console.log("Reproducción de audio iniciada");
+    // Método para limpiar URLs y estados de upload
+    clearUploadState() {
+      this.uploadProgress = 0;
+      this.isUploading = false;
+      this.lastUploadedAudioPath = null;
+      this.signedURL = null;
     },
   },
 });

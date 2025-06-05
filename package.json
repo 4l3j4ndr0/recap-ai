@@ -14,15 +14,14 @@
     "amplify-sandbox": "npx ampx sandbox --profile sso-personal"
   },
   "dependencies": {
-    "@aws-amplify/auth": "^6.3.14",
-    "@aws-amplify/backend": "^1.1.1",
-    "@aws-amplify/backend-cli": "^1.2.3",
-    "@aws-amplify/storage": "^6.6.1",
+    "@aws-amplify/auth": "^6.13.0",
+    "@aws-amplify/backend": "^1.16.1",
+    "@aws-amplify/backend-cli": "^1.7.2",
+    "@aws-amplify/storage": "^6.9.0",
     "@aws-amplify/ui-vue": "^4.2.11",
     "@aws-lambda-powertools/logger": "^2.7.0",
     "@aws-sdk/client-apigatewaymanagementapi": "^3.632.0",
-    "@aws-sdk/client-bedrock-agent-runtime": "^3.632.0",
-    "@aws-sdk/client-polly": "^3.632.0",
+    "@aws-sdk/client-transcribe": "^3.824.0",
     "@quasar/extras": "^1.17.0",
     "aws-amplify": "^6.5.0",
     "aws-cdk": "^2.151.0",
@@ -47,8 +46,8 @@
     "typescript": "^4.5.4"
   },
   "engines": {
-    "node": "^18 || ^16 || ^14.19",
-    "npm": ">= 6.13.4",
+    "node": "^18 || ^20 || ^22",
+    "npm": ">= 8.0.0",
     "yarn": ">= 1.21.1"
   }
 }
