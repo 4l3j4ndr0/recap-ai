@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+//@ts-ignore ;
 import { LocalStorage } from "quasar";
 import { signOut, fetchAuthSession, getCurrentUser } from "@aws-amplify/auth";
 export const useUserStore = defineStore("user", {

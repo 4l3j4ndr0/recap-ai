@@ -20,6 +20,7 @@ import { DisconnectFunction } from "./functions/disconnect-function/resource";
 // import { SendMessageFunction } from "./functions/send-messages-function/resource";
 import { AuthorizerFunction } from "./functions/authorizer-function/resource";
 import { OnNewRecordFunction } from "./functions/bucket-event-trigger-new-recording/resource";
+import { OnNewTranscriptionFunction } from "./functions/bucket-event-trigger-new-transcription/resource";
 /**
  * @see https://docs.amplify.aws/react/build-a-backend/ to add storage, functions, and more
  */
@@ -31,6 +32,7 @@ const backend = defineBackend({
   // AuthorizerFunction,
   storage,
   OnNewRecordFunction,
+  OnNewTranscriptionFunction,
   data,
 });
 
@@ -39,21 +41,42 @@ backend.storage.resources.bucket.addEventNotification(
   new LambdaDestination(backend.OnNewRecordFunction.resources.lambda),
   {
     prefix: "users-recordings/",
-  }
+  },
+);
+
+backend.storage.resources.bucket.addEventNotification(
+  EventType.OBJECT_CREATED_PUT,
+  new LambdaDestination(backend.OnNewTranscriptionFunction.resources.lambda),
+  {
+    prefix: "transcriptions/",
+    suffix: ".json",
+  },
 );
 
 backend.OnNewRecordFunction.resources.lambda.addToRolePolicy(
   new PolicyStatement({
     actions: ["transcribe:StartTranscriptionJob"],
     resources: ["*"],
-  })
+  }),
 );
 
-backend.OnNewRecordFunction.resources.lambda.addToRolePolicy(
+backend.OnNewTranscriptionFunction.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ["s3:GetObject", "bedrock:InvokeModel"],
+    resources: ["*"],
+  }),
+);
+
+backend.OnNewTranscriptionFunction.resources.lambda.addToRolePolicy(
   new PolicyStatement({
     actions: ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:GetItem"],
     resources: ["*"],
-  })
+  }),
+);
+
+backend.OnNewTranscriptionFunction.addEnvironment(
+  "MODEL_ID",
+  "us.anthropic.claude-sonnet-4-20250514-v1:0",
 );
 
 const customResourcesStack = backend.createStack("custom-resources-stack");
@@ -91,7 +114,7 @@ const transcribeServiceRole = new Role(
         ],
       }),
     },
-  }
+  },
 );
 
 // // Agregar permisos para que Lambda pueda pasar el rol a Transcribe
@@ -104,12 +127,12 @@ backend.OnNewRecordFunction.resources.lambda.addToRolePolicy(
         "iam:PassedToService": "transcribe.amazonaws.com",
       },
     },
-  })
+  }),
 );
 
 backend.OnNewRecordFunction.addEnvironment(
   "TRANSCRIBE_ROLE_ARN",
-  transcribeServiceRole.roleArn
+  transcribeServiceRole.roleArn,
 );
 
 // const apiStack = backend.createStack("api-stack");

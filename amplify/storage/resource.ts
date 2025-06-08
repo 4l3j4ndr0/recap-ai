@@ -4,5 +4,6 @@ export const storage = defineStorage({
   name: "recap-ai",
   access: (allow) => ({
     "users-recordings/*": [allow.authenticated.to(["read", "write"])],
+    "transcriptions/*": [allow.authenticated.to(["read", "write"])],
   }),
 });

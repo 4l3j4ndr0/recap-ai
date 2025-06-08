@@ -1,12 +1,13 @@
 import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
 import { OnNewRecordFunction } from "../functions/bucket-event-trigger-new-recording/resource";
+import { OnNewTranscriptionFunction } from "../functions/bucket-event-trigger-new-transcription/resource";
 const schema = a
   .schema({
     RecordingSummary: a
       .model({
         id: a.id().required(),
         userId: a.id().required(),
-
+        summaryTitle: a.string(),
         // Estado del procesamiento
         status: a.enum([
           "COMPLETED",
@@ -47,12 +48,14 @@ const schema = a
         isArchived: a.boolean().default(false),
         isFavorite: a.boolean().default(false),
       })
+      .secondaryIndexes((index) => [index("userId").queryField("listByUserId")])
       .authorization((allow) => [
-        allow.owner().to(["create", "read", "update", "delete"]),
+        allow.authenticated().to(["list", "listen", "update", "delete"]),
       ]),
   })
   .authorization((allow) => [
     allow.resource(OnNewRecordFunction).to(["mutate"]),
+    allow.resource(OnNewTranscriptionFunction).to(["mutate"]),
   ]);
 
 export type Schema = ClientSchema<typeof schema>;

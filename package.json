@@ -11,16 +11,20 @@
     "build": "quasar build",
     "dev-pwa": "quasar dev -m pwa",
     "build-pwa": "quasar build --mode pwa",
-    "amplify-sandbox": "npx ampx sandbox --profile sso-personal"
+    "amplify-sandbox": "npx ampx sandbox --profile sso-personal",
+    "amplify-sandbox-delete": "npx ampx sandbox delete --profile sso-personal"
   },
   "dependencies": {
     "@aws-amplify/auth": "^6.13.0",
     "@aws-amplify/backend": "^1.16.1",
     "@aws-amplify/backend-cli": "^1.7.2",
+    "@aws-amplify/data-construct": "^1.16.1",
     "@aws-amplify/storage": "^6.9.0",
     "@aws-amplify/ui-vue": "^4.2.11",
     "@aws-lambda-powertools/logger": "^2.7.0",
     "@aws-sdk/client-apigatewaymanagementapi": "^3.632.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.826.0",
+    "@aws-sdk/client-s3": "^3.826.0",
     "@aws-sdk/client-transcribe": "^3.824.0",
     "@quasar/extras": "^1.17.0",
     "aws-amplify": "^6.5.0",
@@ -28,12 +32,14 @@
     "aws-cdk-lib": "^2.151.0",
     "axios": "^1.2.1",
     "constructs": "^10.3.0",
+    "esbuild": "^0.25.5",
     "jsonwebtoken": "^9.0.2",
     "jwk-to-pem": "^2.0.6",
     "pinia": "^2.0.11",
     "quasar": "^2.18.1",
     "vue": "^3.0.0",
     "vue-i18n": "^9.2.2",
+    "vue-markdown-render": "^2.2.1",
     "vue-router": "^4.0.0"
   },
   "devDependencies": {

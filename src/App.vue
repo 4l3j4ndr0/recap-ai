@@ -11,8 +11,7 @@ window.process = {
 };
 var exports = {};
 import { Amplify } from "aws-amplify";
-import { generateClient } from "aws-amplify/data";
-import type { Schema } from "../amplify/data/resource";
+
 //@ts-ignore
 import outputs from "../amplify_outputs.json";
 Amplify.configure(outputs);
@@ -32,12 +31,13 @@ var exports = {};
 import { onBeforeMount, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useUserStore } from "./stores/User";
-import { useGeneralStore } from "./stores/General";
+import { useRecordingSummaryStore } from "./stores/RecordingSumary";
 import { Hub } from "aws-amplify/utils";
+import { CONNECTION_STATE_CHANGE, ConnectionState } from "aws-amplify/data";
 //@ts-ignore
 import mixin from "./mixins/mixin";
 const user = useUserStore();
-const general = useGeneralStore();
+const recordingSummary = useRecordingSummaryStore();
 // general.setWebsocketEndpoint(outputs.custom.WebSocketApiEndpoint);
 const router = useRouter();
 const { hideLoading } = mixin();
@@ -49,14 +49,17 @@ watch(user, (val) => {
   }
 });
 
-const client = generateClient<Schema>();
-
 onBeforeMount(async () => {
-  const sub = client.models.RecordingSummary.onCreate().subscribe({
-    next: (data) => console.log("New Data::::", data),
-    error: (error) => console.warn(error),
+  Hub.listen("api", async (data: any) => {
+    const { payload } = data;
+    if (payload.event === CONNECTION_STATE_CHANGE) {
+      const connectionState = payload.data.connectionState as ConnectionState;
+      console.log(connectionState);
+      if (connectionState === ConnectionState.Connected) {
+        await recordingSummary.getRecordingSummaries();
+      }
+    }
   });
-
   Hub.listen("auth", ({ payload }) => {
     switch (payload.event) {
       case "signedIn":
