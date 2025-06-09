@@ -9,8 +9,10 @@
           <!-- Sección de imagen/background izquierda -->
           <div class="login-hero">
             <div class="hero-content">
-              <h2 class="hero-title">Welcomer back</h2>
-              <p class="hero-subtitle">Recap AI</p>
+              <h2 class="hero-title">Welcome to the Future</h2>
+              <p class="hero-subtitle">
+                Where AI Turns Conversations into Clarity
+              </p>
             </div>
           </div>
 
