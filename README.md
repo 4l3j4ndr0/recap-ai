@@ -114,6 +114,7 @@ npm run amplify-sandbox -- --profile <my-profile>
 ## 🏆 Hackathon Achievement
 
 [![AWS Lambda Hackathon 2025](https://img.shields.io/badge/🏆_Built_for-AWS_Lambda_Hackathon_2025-orange?style=for-the-badge)](https://awslambdahackathon.devpost.com/)
+
 RecapAI showcases the power of serverless architecture in creating intelligent, scalable applications that solve real-world productivity challenges.
 
 ### Why Serverless?
