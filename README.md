@@ -4,6 +4,9 @@
   <img src="./assets/login.png" alt="RecapAI Dashboard" width="800"/>
 </div>
 <div align="center">
+  <img src="./assets/IndexPage.png" alt="RecapAI Dashboard" width="800"/>
+</div>
+<div align="center">
   <img src="./assets/summary.png" alt="RecapAI Dashboard" width="800"/>
 </div>
 
