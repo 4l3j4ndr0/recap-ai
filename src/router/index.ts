@@ -7,7 +7,7 @@ import {
 } from "vue-router";
 
 import routes from "./routes";
-import { useUserStore } from "src/stores/User";
+import { useUserStore } from "../stores/User";
 
 /*
  * If not building with SSR mode, you can
@@ -23,8 +23,8 @@ export default route(function (/* { store, ssrContext } */) {
   const createHistory = process.env.SERVER
     ? createMemoryHistory
     : process.env.VUE_ROUTER_MODE === "history"
-    ? createWebHistory
-    : createWebHashHistory;
+      ? createWebHistory
+      : createWebHashHistory;
 
   const Router = createRouter({
     scrollBehavior: () => ({ left: 0, top: 0 }),
@@ -40,27 +40,20 @@ export default route(function (/* { store, ssrContext } */) {
     if (to.path === "/login") {
       const token = await user.currentSession();
       if (token && token.idToken) {
-        next({
+        return next({
           path: "/",
         });
       } else {
-        next();
+        return next();
       }
     } else {
-      if (to.path !== "/login") {
-        if (!user.token) {
-          next({
-            path: "/login",
-          });
-        }
-        next();
-      } else {
-        if (user.token) {
-          next({
-            path: "/",
-          });
-        }
+      // Si NO es login
+      if (!user.token) {
+        return next({
+          path: "/login",
+        });
       }
+      return next();
     }
   });
 

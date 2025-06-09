@@ -39,7 +39,7 @@ client.models.RecordingSummary.onCreate({
   authMode: "userPool",
 }).subscribe({
   next: (data) => {
-    console.log("New recording summary created:", data);
+    // console.log("New recording summary created:", data);
     recordingSummary.addRecordingSummaryListener(data);
   },
   error: (error) => console.warn(error),
@@ -52,7 +52,7 @@ client.models.RecordingSummary.onUpdate({
   authMode: "userPool",
 }).subscribe({
   next: (data) => {
-    console.log("New recording summary updated:", data);
+    // console.log("New recording summary updated:", data);
     recordingSummary.updateRecordyngSummaryListener(data);
   },
   error: (error) => console.warn(error),
@@ -62,9 +62,12 @@ const onRecordingStarted = () => {
   console.log("Grabación iniciada.");
 };
 
-const onRecordingStopped = async (audioBlob: any, duration: any) => {
+const onRecordingStopped = async (audioBlob: any, duration: string) => {
   console.log(`Grabación detenida. Duración: ${duration}`);
   console.log("Audio blob:", audioBlob);
+  if (!validateRecordingMinDUration(duration)) {
+    return;
+  }
   const result = await general.uploadAudioToS3(audioBlob, user.userId);
   result.success
     ? showNoty(
@@ -78,6 +81,16 @@ const onRecordingStopped = async (audioBlob: any, duration: any) => {
 
   const audioUrl = URL.createObjectURL(audioBlob);
   console.log("Audio URL:", audioUrl);
+};
+
+const validateRecordingMinDUration = (duration: string) => {
+  return true;
+  const minutes = parseInt(duration.split(":")[0], 10);
+  if (minutes < 2) {
+    showNoty("error", "The recording must be at least 3 minutes long.");
+    return false;
+  }
+  return true;
 };
 
 const onRecordingError = (error: any) => {

@@ -40,7 +40,7 @@
     <!-- Controles de filtro y búsqueda -->
     <div class="controls-section q-mb-lg">
       <div class="row q-gutter-md items-center">
-        <div class="col-12 col-sm-6 col-md-4">
+        <div class="col-12 col-sm-4 col-md-4">
           <q-input
             v-model="searchQuery"
             outlined
@@ -196,7 +196,12 @@
                 </div>
               </q-card-section>
 
-              <q-card-section v-else-if="recording.status === 'TRANSCRIBING'">
+              <q-card-section
+                v-else-if="
+                  recording.status !== 'COMPLETED' ||
+                  recording.status !== 'FAILED'
+                "
+              >
                 <div class="processing-section">
                   <q-linear-progress
                     indeterminate
@@ -205,7 +210,11 @@
                   />
                   <div class="text-center text-grey-6">
                     <q-icon name="hourglass_empty" />
-                    Processing your recording...
+                    {{
+                      recording.status === "TRANSCRIBING"
+                        ? "Processing your recording..."
+                        : "Generating AI summary..."
+                    }}
                   </div>
                 </div>
               </q-card-section>
@@ -215,7 +224,7 @@
 
         <!-- Acciones -->
         <q-card-actions align="right" class="q-pa-md">
-          <q-btn
+          <!-- <q-btn
             @click="toggleFavorite(recording)"
             :color="recording.isFavorite ? 'pink' : 'grey-5'"
             :icon="recording.isFavorite ? 'favorite' : 'favorite_border'"
@@ -230,7 +239,7 @@
                   : "Add to favorites"
               }}
             </q-tooltip>
-          </q-btn>
+          </q-btn> -->
 
           <q-btn
             v-if="recording.transcriptionS3Uri"
@@ -245,15 +254,17 @@
           </q-btn>
 
           <q-btn
-            @click="playAudio(recording)"
-            color="positive"
-            icon="play_arrow"
+            @click="!audioPlayer ? playAudio(recording) : stopAudio()"
+            :color="!audioPlayer ? 'positive' : 'negative'"
+            :icon="audioPlayer ? 'stop' : 'play_arrow'"
             flat
             dense
             round
             :loading="playingId === recording.id"
           >
-            <q-tooltip>Play audio</q-tooltip>
+            <q-tooltip>{{
+              audioPlayer ? "Play audio" : "Stop audio"
+            }}</q-tooltip>
           </q-btn>
 
           <q-btn
@@ -311,12 +322,14 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useRecordingSummaryStore } from "../stores/RecordingSumary";
 import { useGeneralStore } from "../stores/General";
 import { date } from "quasar";
+import { useRouter } from "vue-router";
 //@ts-ignore
 import mixin from "../mixins/mixin";
 
 const { showNoty } = mixin();
 const recordingStore = useRecordingSummaryStore();
 const generalStore = useGeneralStore();
+const router = useRouter();
 
 // Estado reactivo
 const isLoading = ref(false);
@@ -324,6 +337,7 @@ const searchQuery = ref("");
 const statusFilter = ref("all");
 const sortBy = ref("newest");
 const playingId = ref(null);
+const audioPlayer = ref(null);
 
 // Opciones para filtros
 const statusOptions = [
@@ -512,9 +526,9 @@ const playAudio = async (recording) => {
   try {
     playingId.value = recording.id;
     // Aquí puedes implementar la lógica para obtener la URL del audio desde S3
-    // const audioUrl = await generalStore.getAudioUrl(recording.s3Uri);
-    // const audio = new Audio(audioUrl);
-    // audio.play();
+    const audioUrl = await generalStore.getAudioSignedUrl(recording.s3Uri);
+    audioPlayer.value = new Audio(audioUrl);
+    audioPlayer.value.play();
 
     // Por ahora, simular reproducción
     setTimeout(() => {
@@ -523,15 +537,22 @@ const playAudio = async (recording) => {
 
     showNoty("info", "Playing audio...");
   } catch (error) {
+    console.log("error:::::", error);
     playingId.value = null;
     showNoty("error", "Error playing audio");
   }
 };
 
+const stopAudio = () => {
+  if (audioPlayer.value) {
+    audioPlayer.value.pause();
+    audioPlayer.value = null;
+    playingId.value = null;
+  }
+};
+
 const showRecordingDetails = (recording) => {
-  // Aquí puedes implementar un diálogo con detalles completos
-  console.log("Show details for:", recording);
-  showNoty("info", "Feature coming soon");
+  router.push(`/recording/${recording.id}`);
 };
 
 const deleteRecording = async (recording) => {
@@ -665,15 +686,63 @@ watch(
   line-height: 1.5;
 }
 
-.summary-text {
-  background: #fff9e6;
-  padding: 0.75rem;
-  border-radius: 8px;
-  border-left: 3px solid #f39c12;
-  font-size: 0.9rem;
-  line-height: 1.5;
+.summary-text :deep(h1) {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 8px 0 4px 0;
+  color: var(--q-primary);
 }
 
+.summary-text :deep(h2) {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 6px 0 3px 0;
+  color: var(--q-secondary);
+}
+
+.summary-text :deep(h3) {
+  font-size: 1rem;
+  font-weight: 500;
+  margin: 4px 0 2px 0;
+  color: var(--q-dark);
+}
+
+.summary-text :deep(h4),
+.summary-text :deep(h5),
+.summary-text :deep(h6) {
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin: 3px 0 1px 0;
+  color: var(--q-grey-8);
+}
+
+.summary-text :deep(p) {
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+
+.summary-text :deep(ul),
+.summary-text :deep(ol) {
+  margin: 2px 0 4px 0;
+  padding-left: 16px;
+}
+
+.summary-text :deep(li) {
+  margin-bottom: 1px;
+  line-height: 1.2;
+}
+
+.summary-text :deep(h1 + p),
+.summary-text :deep(h2 + p),
+.summary-text :deep(h3 + p) {
+  margin-top: 0;
+}
+
+.summary-text :deep(p + h1),
+.summary-text :deep(p + h2),
+.summary-text :deep(p + h3) {
+  margin-top: 8px;
+}
 .notes-text {
   background: #f0f8ff;
   padding: 0.75rem;

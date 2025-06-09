@@ -22,6 +22,7 @@ const schema = a
 
         // Contenido del resumen generado por LLM (en formato Markdown)
         summaryMarkdown: a.string(), // Contenido completo del resumen en Markdown
+        mermaidDiagram: a.string(), // Diagrama Mermaid generado
 
         transcriptionS3Uri: a.string(), // URI del archivo de transcripción
         transcriptionText: a.string(), // Texto completo transcrito
@@ -50,7 +51,7 @@ const schema = a
       })
       .secondaryIndexes((index) => [index("userId").queryField("listByUserId")])
       .authorization((allow) => [
-        allow.authenticated().to(["list", "listen", "update", "delete"]),
+        allow.authenticated().to(["list", "listen", "update", "delete", "get"]),
       ]),
   })
   .authorization((allow) => [

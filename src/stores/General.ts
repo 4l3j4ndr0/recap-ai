@@ -1,6 +1,5 @@
 import { defineStore } from "pinia";
 import { getUrl, uploadData } from "@aws-amplify/storage";
-import axios from "axios";
 
 export const useGeneralStore = defineStore("general", {
   state: () => ({
@@ -31,7 +30,7 @@ export const useGeneralStore = defineStore("general", {
       this.token = token;
       //@ts-ignore
       this.sockeClient = new WebSocket(
-        `${this.webSocketEndpoint}?idToken=${token}`
+        `${this.webSocketEndpoint}?idToken=${token}`,
       );
     },
 
@@ -43,14 +42,14 @@ export const useGeneralStore = defineStore("general", {
           action: "SendMessage",
           message,
           token: this.token,
-        })
+        }),
       );
     },
 
     async uploadAudioToS3(
       audioBlob: Blob,
       userId: string,
-      fileName?: string
+      fileName?: string,
     ): Promise<{
       success: boolean;
       path?: string;
@@ -84,7 +83,7 @@ export const useGeneralStore = defineStore("general", {
             onProgress: ({ transferredBytes, totalBytes }) => {
               if (totalBytes) {
                 this.uploadProgress = Math.round(
-                  (transferredBytes / totalBytes) * 100
+                  (transferredBytes / totalBytes) * 100,
                 );
                 console.log(`Upload progress: ${this.uploadProgress}%`);
               }
@@ -113,16 +112,41 @@ export const useGeneralStore = defineStore("general", {
     // Método para obtener URL firmada de un audio existente
     async getAudioSignedUrl(
       path: string,
-      expiresIn: number = 3600
+      expiresIn: number = 3600,
     ): Promise<string | null> {
       try {
+        // Limpiar el path de cualquier prefijo del bucket
+        let cleanPath = path;
+
+        // Si el path contiene información del bucket, limpiarla
+        if (path.includes("s3://") || path.includes("%3A//")) {
+          // Extraer solo la parte del path después del bucket
+          const pathParts = path.split("/");
+          const bucketEndIndex = pathParts.findIndex(
+            (part) =>
+              part.includes("recapaibucket") ||
+              part.includes("users-recordings"),
+          );
+
+          if (bucketEndIndex !== -1) {
+            if (pathParts[bucketEndIndex].includes("users-recordings")) {
+              cleanPath = pathParts.slice(bucketEndIndex).join("/");
+            } else {
+              cleanPath = pathParts.slice(bucketEndIndex + 1).join("/");
+            }
+          }
+        }
+
         const urlResult = await getUrl({
-          path: path,
+          path: cleanPath,
           options: {
             expiresIn: expiresIn,
           },
         });
-        return urlResult.url.toString();
+
+        const finalUrl = urlResult.url.toString();
+
+        return finalUrl;
       } catch (error) {
         console.error("Error al obtener URL firmada:", error);
         return null;

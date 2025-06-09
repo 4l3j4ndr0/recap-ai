@@ -31,6 +31,8 @@ export const handler: Handler = async (event) => {
         record.s3.object.key.replace(/\+/g, " "),
       );
 
+      const fileSize = record.s3.object.size;
+
       // Verificar que sea un archivo de audio válido
       if (!isValidAudioFile(objectKey)) {
         console.log(`Skipping non-audio file: ${objectKey}`);
@@ -62,7 +64,7 @@ export const handler: Handler = async (event) => {
       });
 
       // Guardar estado inicial en DynamoDB
-      await saveInitialStatus(jobName, userId, fileName, inputUri);
+      await saveInitialStatus(jobName, userId, fileName, inputUri, fileSize);
 
       console.log(`Transcription job started successfully: ${jobName}`);
     } catch (error) {
@@ -129,6 +131,7 @@ async function saveInitialStatus(
   userId: string,
   fileName: string,
   inputUri: string,
+  fileSize: number,
 ) {
   try {
     const { errors: createErrors, data: newRecordingSummary } =
@@ -140,6 +143,7 @@ async function saveInitialStatus(
         s3Uri: inputUri, // Agregar este campo
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        fileSize,
       });
 
     if (createErrors) {

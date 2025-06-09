@@ -9,8 +9,8 @@
           <!-- Sección de imagen/background izquierda -->
           <div class="login-hero">
             <div class="hero-content">
-              <h2 class="hero-title">Bienvenido de vuelta</h2>
-              <p class="hero-subtitle">Ingresa a tu cuenta para continuar</p>
+              <h2 class="hero-title">Welcomer back</h2>
+              <p class="hero-subtitle">Recap AI</p>
             </div>
           </div>
 
@@ -21,7 +21,6 @@
                 <div class="logo-container">
                   <img class="logo" alt="Logo" src="logo.jpeg" />
                 </div>
-                <h4 class="login-title">Iniciar Sesión</h4>
               </q-card-section>
 
               <q-card-section class="login-form">
@@ -42,6 +41,7 @@
 <script setup lang="ts">
 import { Authenticator } from "@aws-amplify/ui-vue";
 import "@aws-amplify/ui-vue/styles.css";
+//@ts-ignore
 import { useQuasar } from "quasar";
 
 const $q: any = useQuasar();
@@ -61,7 +61,8 @@ const $q: any = useQuasar();
 /* Sección izquierda - Hero/Background */
 .login-hero {
   flex: 1;
-  background: linear-gradient(
+  background:
+    linear-gradient(
       135deg,
       rgba(17, 51, 89, 0.7) 0%,
       rgba(17, 51, 89, 0.5) 50%,

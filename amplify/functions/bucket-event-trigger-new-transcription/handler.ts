@@ -35,6 +35,12 @@ interface TranscriptionResult {
 interface BedrockResponse {
   title: string;
   summary: string;
+  mermaidDiagrams?: {
+    title: string;
+    description: string;
+    type: string;
+    diagram: string;
+  }[];
 }
 
 const MODEL_ID =
@@ -96,6 +102,7 @@ export const handler: Handler = async (event) => {
         bedrockResponse.summary,
         languageCode,
         `s3://${bucketName}/${objectKey}`,
+        bedrockResponse.mermaidDiagrams || [],
       );
 
       console.log(`Successfully processed transcription for job: ${jobName}`);
@@ -204,10 +211,15 @@ function parseBedrockResponse(content: string): BedrockResponse {
 
     const parsedResponse = JSON.parse(jsonString);
 
-    if (parsedResponse.title && parsedResponse.summary) {
+    if (
+      parsedResponse.title &&
+      parsedResponse.summary &&
+      parsedResponse.mermaidDiagrams
+    ) {
       return {
         title: parsedResponse.title.substring(0, 200),
         summary: parsedResponse.summary,
+        mermaidDiagrams: parsedResponse.mermaidDiagrams || [],
       };
     }
 
@@ -236,9 +248,9 @@ function createSummaryPrompt(
   transcriptionText: string,
   languageCode: string,
 ): string {
-  const language = languageCode.startsWith("es") ? "Spanish" : LanguageCode;
+  const language = languageCode.startsWith("es") ? "Spanish" : "English";
 
-  return `You are an expert content analysis and structured summary generation assistant. Your task is to analyze the following transcription from a recording (meeting, conference, podcast, interview, etc.) and create a comprehensive, well-structured summary.
+  return `You are an expert content analysis and structured summary generation assistant. Your task is to analyze the following transcription from a recording (meeting, conference, podcast, interview, etc.) and create a comprehensive, well-structured summary with visual flow diagrams when applicable.
 
 TRANSCRIPTION TO ANALYZE:
 ${transcriptionText}
@@ -255,13 +267,63 @@ INSTRUCTIONS:
 9. Maintain a professional and objective tone
 10. Extract actionable items when present
 11. Highlight important decisions or agreements
+12. Generate Mermaid flow diagrams when processes, workflows, or decision trees are discussed
+13. Create visual representations for organizational structures, timelines, or system architectures when mentioned
+
+MERMAID DIAGRAM GUIDELINES:
+- Generate flowcharts for processes, workflows, or decision flows
+- Create timeline diagrams for project schedules or historical events
+- Use organizational charts for company structures or team hierarchies
+- Generate sequence diagrams for system interactions or communication flows
+- Only include diagrams when the content clearly describes processes, flows, or structures
+- Keep diagrams simple and focused on the main concepts
+- Use clear, concise labels in ${language}
 
 REQUIRED RESPONSE FORMAT:
 Respond only with valid JSON using this exact structure:
 {
   "title": "Descriptive and specific content title",
-  "summary": "Markdown formatted summary in ${language}"
+  "summary": "Markdown formatted summary in ${language}",
+  "mermaidDiagrams": [
+    {
+      "title": "Diagram title",
+      "description": "Brief description of what the diagram represents",
+      "type": "flowchart|timeline|gitgraph|sequence|classDiagram|erDiagram|gantt|pie|quadrantChart|mindmap|sankey",
+      "diagram": "mermaid diagram code"
+    }
+  ]
 }
+
+MERMAID DIAGRAM TYPES AND EXAMPLES:
+
+Flowchart:
+\`\`\`
+flowchart TD
+    A[Start] --> B{Decision}
+    B -->|Yes| C[Action 1]
+    B -->|No| D[Action 2]
+    C --> E[End]
+    D --> E
+\`\`\`
+
+Timeline:
+\`\`\`
+timeline
+    title Project Timeline
+    2024-01-01 : Project Start
+    2024-02-15 : Phase 1 Complete
+    2024-03-30 : Phase 2 Complete
+    2024-04-15 : Final Delivery
+\`\`\`
+
+Sequence Diagram:
+\`\`\`
+sequenceDiagram
+    participant A as User
+    participant B as System
+    A->>B: Request
+    B-->>A: Response
+\`\`\`
 
 REQUIREMENTS:
 - Title must be specific and descriptive (max 80 characters) in ${language}
@@ -274,6 +336,9 @@ REQUIREMENTS:
 - Maintain professional and objective tone
 - Extract actionable items when present
 - Highlight important decisions or agreements
+- Generate Mermaid diagrams only when the content clearly describes processes, workflows, organizational structures, timelines, or system architectures
+- Ensure all Mermaid diagram syntax is valid and properly formatted
+- If no diagrams are applicable, return an empty array for mermaidDiagrams
 
 Respond ONLY with the requested JSON, no additional text before or after.`;
 }
@@ -318,6 +383,7 @@ async function updateRecordingWithSummary(
   summaryMarkdown: string,
   languageCode: string,
   transcriptionS3Uri: string,
+  mermaidDiagrams: any[] = [],
 ) {
   try {
     const { errors } = await client.models.RecordingSummary.update({
@@ -330,6 +396,7 @@ async function updateRecordingWithSummary(
       transcriptionS3Uri: transcriptionS3Uri,
       llmModel: MODEL_ID,
       updatedAt: new Date().toISOString(),
+      mermaidDiagram: JSON.stringify(mermaidDiagrams),
     });
 
     if (errors) {

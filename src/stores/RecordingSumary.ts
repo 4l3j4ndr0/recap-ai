@@ -8,11 +8,20 @@ const client = generateClient<Schema>();
 export const useRecordingSummaryStore = defineStore("recording-summary", {
   state: () => ({
     recordingSummaries: [] as any[],
+    recordingSummary: null as any | null,
   }),
 
   actions: {
     addRecordingSummaryListener(recordingSummary: any) {
-      this.recordingSummaries.push(recordingSummary);
+      // Verificar si ya existe un resumen con el mismo ID
+      const existingIndex = this.recordingSummaries.findIndex(
+        (summary) => summary.id === recordingSummary.id,
+      );
+      if (existingIndex !== -1) {
+        // Si ya existe, actualizarlo
+        this.recordingSummaries[existingIndex] = recordingSummary;
+        return;
+      }
     },
     updateRecordyngSummaryListener(recordingSummary: any) {
       const index = this.recordingSummaries.findIndex(
@@ -26,6 +35,9 @@ export const useRecordingSummaryStore = defineStore("recording-summary", {
       this.recordingSummaries = this.recordingSummaries.filter(
         (summary) => summary.id !== recordingSummaryId,
       );
+    },
+    resetRecordingSummary() {
+      this.recordingSummary = null;
     },
     async getRecordingSummaries() {
       try {
@@ -52,6 +64,33 @@ export const useRecordingSummaryStore = defineStore("recording-summary", {
         return {
           error: true,
           message: err.message || "Error fetching recording summaries",
+        };
+      }
+    },
+    async getRecordSummaryById(recordingSummaryId: string) {
+      try {
+        const { data, errors } = await client.models.RecordingSummary.get({
+          id: recordingSummaryId,
+        });
+        if (errors && errors.length > 0) {
+          throw new Error(errors[0].message);
+        }
+        this.recordingSummary = data || null;
+        if (!this.recordingSummary) {
+          return {
+            error: true,
+            message: "Recording summary not found",
+          };
+        }
+        return {
+          error: false,
+          message: "Recording summary fetched successfully",
+          data: this.recordingSummary,
+        };
+      } catch (err: any) {
+        return {
+          error: true,
+          message: err.message || "Error fetching recording summary",
         };
       }
     },
