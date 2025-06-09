@@ -14,7 +14,7 @@ Transform every meeting into instantly digestible, visual summaries with the pow
 
 ## 🌟 Project Vision
 
-We realized that while we have powerful AI tools at our disposal, most people still rely on manual note-taking or lengthy recordings they never revisit. **What if we could transform every meeting into an instantly digestible, visual summary?**
+I realized that even though I have powerful AI tools at my fingertips, I still rely on manual note-taking or long recordings I never revisit. **What if I could transform every meeting into an instantly digestible, visual summary?**
 
 RecapAI is a **truly serverless solution** that scales automatically based on demand, without the overhead of managing infrastructure, built specifically for the AWS Lambda Hackathon.
 
