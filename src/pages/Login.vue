@@ -21,7 +21,7 @@
             <q-card class="login-card" flat>
               <q-card-section class="login-header">
                 <div class="logo-container">
-                  <img class="logo" alt="Logo" src="logo.jpeg" />
+                  <img class="logo" alt="Logo" src="logo.png" />
                 </div>
               </q-card-section>
 
