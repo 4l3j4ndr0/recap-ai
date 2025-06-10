@@ -23,13 +23,18 @@ const backend = defineBackend({
   data,
 });
 
-backend.storage.resources.bucket.addEventNotification(
-  EventType.OBJECT_CREATED_PUT,
-  new LambdaDestination(backend.OnNewRecordFunction.resources.lambda),
-  {
-    prefix: "users-recordings/",
-  },
-);
+const audioFormats = [".mp3", ".webm", ".wav", ".m4a", ".ogg", ".flac"];
+
+audioFormats.forEach((suffix) => {
+  backend.storage.resources.bucket.addEventNotification(
+    EventType.OBJECT_CREATED,
+    new LambdaDestination(backend.OnNewRecordFunction.resources.lambda),
+    {
+      prefix: "users-recordings/",
+      suffix: suffix,
+    },
+  );
+});
 
 backend.storage.resources.bucket.addEventNotification(
   EventType.OBJECT_CREATED_PUT,
