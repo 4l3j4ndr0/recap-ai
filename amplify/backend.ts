@@ -72,7 +72,7 @@ const transcribeServiceRole = new Role(
   customResourcesStack,
   "TranscribeServiceRole",
   {
-    roleName: "RecapAI-TranscribeServiceRole",
+    roleName: `RecapAI-TranscribeServiceRole-${new Date().getTime()}`,
     assumedBy: new ServicePrincipal("transcribe.amazonaws.com"),
     description: "Role for Amazon Transcribe to access S3 buckets",
     inlinePolicies: {
