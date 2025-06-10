@@ -364,7 +364,9 @@ import { useRouter, useRoute } from "vue-router";
 import mixin from "../mixins/mixin";
 import { useRecordingSummaryStore } from "../../src/stores/RecordingSumary";
 import { useGeneralStore } from "../../src/stores/General";
-const { showNoty } = mixin();
+import { useQuasar } from "quasar";
+const $q = useQuasar();
+const { showNoty, showLoading, hideLoading } = mixin();
 const router = useRouter();
 const route = useRoute();
 
@@ -557,31 +559,20 @@ const copyTranscript = async () => {
 
 const deleteRecording = async (recording) => {
   try {
-    const confirmed = await new Promise((resolve) => {
-      // Usar Quasar Dialog
-      import("quasar").then(({ Dialog }) => {
-        Dialog.create({
-          title: "Delete Recording",
-          message: `Are you sure you want to delete "${recordingSummary.recordingSummary?.originalFileName}"?`,
-          cancel: true,
-          persistent: true,
-        })
-          .onOk(() => {
-            recordingSummary.deleteRecordingSummary(recording.id);
-            router.push("/");
-          })
-          .onCancel(() => resolve(false));
-      });
-    });
-
-    if (confirmed) {
-      const result = await recordingStore.deleteRecordingSummary(recording.id);
-      if (result.error) {
-        showNoty("error", result.message);
-      } else {
+    $q.dialog({
+      title: "Delete Recording",
+      message: `Are you sure you want to delete "${formatFileName(recording.originalFileName)}"?`,
+      cancel: true,
+      persistent: true,
+    })
+      .onOk(async () => {
+        showLoading("Deleting recording...");
+        await recordingStore.deleteRecordingSummary(recording.id);
+        hideLoading();
         showNoty("success", "Recording deleted successfully");
-      }
-    }
+        refreshRecordings();
+      })
+      .onCancel(() => resolve(false));
   } catch (error) {
     showNoty("error", "Error deleting recording");
   }
