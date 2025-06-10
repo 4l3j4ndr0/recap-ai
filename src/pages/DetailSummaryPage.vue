@@ -303,6 +303,17 @@
                       <q-separator />
                       <q-card-section class="diagram-content">
                         <div class="mermaid-wrapper">
+                          <q-btn
+                            round
+                            color="primary"
+                            icon="fullscreen"
+                            size="sm"
+                            class="absolute-top-right q-ma-sm"
+                            @click="expandDiagram(diagram)"
+                          >
+                            <q-tooltip>Expand diagram</q-tooltip></q-btn
+                          >
+
                           <vue-mermaid-string
                             :value="diagram.diagram"
                             :key="`mermaid-${index}`"
@@ -324,13 +335,30 @@
         </div>
       </div>
     </div>
+
+    <q-dialog v-model="modalDiagramRef" full-width>
+      <q-card>
+        <q-card-section class="row items-center">
+          <div class="text-h6">{{ selectedDiagram.title || "Diagram" }}</div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+        <q-card-section class="q-pt-none">
+          <vue-mermaid-string
+            :value="selectedDiagram.diagram"
+            :key="`mermaid-1`"
+            class="mermaid-diagram"
+          />
+        </q-card-section>
+      </q-card>
+    </q-dialog>
   </div>
 </template>
 
 <script setup>
 import VueMarkdown from "vue-markdown-render";
 import VueMermaidString from "vue-mermaid-string";
-import { ref, onUnmounted, onBeforeMount, onMounted } from "vue";
+import { ref, onUnmounted, onBeforeMount } from "vue";
 import { useRouter, useRoute } from "vue-router";
 //@ts-ignore
 import mixin from "../mixins/mixin";
@@ -349,7 +377,6 @@ const props = defineProps({
 });
 
 // Estado reactivo
-const recording = ref(null);
 const activeTab = ref("summary");
 const isPlaying = ref(false);
 const isLoading = ref(false);
@@ -357,9 +384,10 @@ const currentAudio = ref(null);
 const currentTime = ref(0);
 const duration = ref(0);
 const progress = ref(0);
-const diagrams = ref([]);
 const generalStore = useGeneralStore();
 const recordingSummary = useRecordingSummaryStore();
+const modalDiagramRef = ref(false);
+const selectedDiagram = ref(null);
 
 // Computed
 const formatTime = (seconds) => {
@@ -538,7 +566,10 @@ const deleteRecording = async (recording) => {
           cancel: true,
           persistent: true,
         })
-          .onOk(() => resolve(true))
+          .onOk(() => {
+            recordingSummary.deleteRecordingSummary(recording.id);
+            router.push("/");
+          })
           .onCancel(() => resolve(false));
       });
     });
@@ -574,10 +605,9 @@ const getDiagramIcon = (type) => {
   return icons[type] || "account_tree";
 };
 
-// Manejo de errores de Mermaid
-const handleMermaidError = (error) => {
-  console.error("Mermaid diagram error:", error);
-  showNoty("warning", "Some diagrams may not display correctly");
+const expandDiagram = (diagram) => {
+  selectedDiagram.value = diagram;
+  modalDiagramRef.value = true;
 };
 
 // Lifecycle

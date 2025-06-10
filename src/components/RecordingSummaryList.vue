@@ -39,7 +39,13 @@
 
     <!-- Controles de filtro y búsqueda -->
     <div class="controls-section q-mb-lg">
-      <div class="row q-gutter-md items-center">
+      <div
+        class="q-gutter-md items-center"
+        :class="{
+          column: $q.screen.xxs,
+          row: $q.screen.gt.sm,
+        }"
+      >
         <div class="col-12 col-sm-4 col-md-4">
           <q-input
             v-model="searchQuery"
