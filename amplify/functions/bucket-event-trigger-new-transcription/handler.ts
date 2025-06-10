@@ -249,7 +249,6 @@ function createSummaryPrompt(
   languageCode: string,
 ): string {
   const language = languageCode.startsWith("es") ? "Spanish" : "English";
-
   return `You are an expert content analysis and structured summary generation assistant. Your task is to analyze the following transcription from a recording (meeting, conference, podcast, interview, etc.) and create a comprehensive, well-structured summary with visual flow diagrams when applicable.
 
 TRANSCRIPTION TO ANALYZE:
@@ -270,14 +269,30 @@ INSTRUCTIONS:
 12. Generate Mermaid flow diagrams when processes, workflows, or decision trees are discussed
 13. Create visual representations for organizational structures, timelines, or system architectures when mentioned
 
+CRITICAL MERMAID SYNTAX RULES:
+- NEVER use accented characters (á, é, í, ó, ú, ñ, ü) - replace with non-accented versions
+- NEVER use special characters like quotes (", "), parentheses in labels, or symbols (@, #, %, &, +, =)
+- Use only alphanumeric characters, spaces, hyphens, and underscores in node labels
+- Keep node IDs simple: use only letters, numbers, and underscores (A, B1, START_NODE)
+- Use pipe characters | only for choice separators in decision nodes
+- Escape special characters in text with quotes if absolutely necessary
+- Use simple, clear English terms even when content language is ${language}
+- Maximum 50 characters per node label
+- Avoid complex nested structures
+- Test syntax: all nodes must be properly connected with valid arrows
+- Use standard Mermaid keywords only: TD, TB, LR, RL for directions
+
 MERMAID DIAGRAM GUIDELINES:
 - Generate flowcharts for processes, workflows, or decision flows
-- Create timeline diagrams for project schedules or historical events
+- Create timeline diagrams for project schedules or historical events  
 - Use organizational charts for company structures or team hierarchies
 - Generate sequence diagrams for system interactions or communication flows
 - Only include diagrams when the content clearly describes processes, flows, or structures
 - Keep diagrams simple and focused on the main concepts
-- Use clear, concise labels in ${language}
+- Use clear, concise labels without special characters
+- Prefer English terms in diagrams for better compatibility
+- Maximum 15 nodes per diagram to maintain clarity
+- Always validate arrow syntax: --> for solid arrows, -.-> for dotted arrows
 
 REQUIRED RESPONSE FORMAT:
 Respond only with valid JSON using this exact structure:
@@ -286,7 +301,7 @@ Respond only with valid JSON using this exact structure:
   "summary": "Markdown formatted summary in ${language}",
   "mermaidDiagrams": [
     {
-      "title": "Diagram title",
+      "title": "Diagram title", 
       "description": "Brief description of what the diagram represents",
       "type": "flowchart|timeline|gitgraph|sequence|classDiagram|erDiagram|gantt|pie|quadrantChart|mindmap|sankey",
       "diagram": "mermaid diagram code"
@@ -294,36 +309,62 @@ Respond only with valid JSON using this exact structure:
   ]
 }
 
-MERMAID DIAGRAM TYPES AND EXAMPLES:
+SAFE MERMAID EXAMPLES:
 
-Flowchart:
+Flowchart (CORRECT):
 \`\`\`
 flowchart TD
-    A[Start] --> B{Decision}
-    B -->|Yes| C[Action 1]
-    B -->|No| D[Action 2]
-    C --> E[End]
-    D --> E
+    START[Process Start] --> REVIEW{Review Required}
+    REVIEW -->|Yes| APPROVE[Send for Approval]
+    REVIEW -->|No| EXECUTE[Execute Directly]
+    APPROVE --> WAIT[Wait for Response]
+    WAIT --> DECISION{Approved}
+    DECISION -->|Yes| EXECUTE
+    DECISION -->|No| REJECT[Request Rejected]
+    EXECUTE --> END[Process Complete]
+    REJECT --> END
 \`\`\`
 
-Timeline:
+Timeline (CORRECT):
 \`\`\`
 timeline
-    title Project Timeline
-    2024-01-01 : Project Start
-    2024-02-15 : Phase 1 Complete
-    2024-03-30 : Phase 2 Complete
-    2024-04-15 : Final Delivery
+    title Project Development Timeline
+    2024-Q1 : Planning Phase
+             : Requirements Gathering
+    2024-Q2 : Development Phase
+             : Implementation Start
+    2024-Q3 : Testing Phase
+             : Quality Assurance
+    2024-Q4 : Deployment Phase
+             : Production Release
 \`\`\`
 
-Sequence Diagram:
+Sequence Diagram (CORRECT):
 \`\`\`
 sequenceDiagram
-    participant A as User
-    participant B as System
-    A->>B: Request
-    B-->>A: Response
+    participant USER as User
+    participant API as API Gateway
+    participant DB as Database
+    
+    USER ->> API: Send Request
+    API ->> DB: Query Data
+    DB -->> API: Return Results
+    API -->> USER: Send Response
 \`\`\`
+
+FORBIDDEN PATTERNS (WILL CAUSE ERRORS):
+❌ Node labels with accents: [Creación], [Configuración]
+❌ Special characters: [User@Company], [Cost ($100)]
+❌ Quotes in labels: ["User Input"], ['System Response']
+❌ Complex symbols: [Stage #1], [Phase 50%]
+❌ Parentheses in labels: [Review (Stage 1)]
+
+SAFE ALTERNATIVES:
+✅ Use: [Creation], [Configuration]  
+✅ Use: [User at Company], [Cost 100 USD]
+✅ Use: [User Input], [System Response]
+✅ Use: [Stage 1], [Phase 50 Percent]
+✅ Use: [Review Stage 1]
 
 REQUIREMENTS:
 - Title must be specific and descriptive (max 80 characters) in ${language}
@@ -337,7 +378,9 @@ REQUIREMENTS:
 - Extract actionable items when present
 - Highlight important decisions or agreements
 - Generate Mermaid diagrams only when the content clearly describes processes, workflows, organizational structures, timelines, or system architectures
-- Ensure all Mermaid diagram syntax is valid and properly formatted
+- STRICTLY follow Mermaid syntax rules to prevent parsing errors
+- Test each diagram mentally for syntax validity before including
+- If uncertain about syntax, omit the diagram rather than risk errors
 - If no diagrams are applicable, return an empty array for mermaidDiagrams
 
 Respond ONLY with the requested JSON, no additional text before or after.`;

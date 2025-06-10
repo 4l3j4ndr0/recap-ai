@@ -346,7 +346,7 @@
         <q-card-section class="q-pt-none">
           <vue-mermaid-string
             :value="selectedDiagram.diagram"
-            :key="`mermaid-1`"
+            :key="`mermaid-modal-${Date.now()}`"
             class="mermaid-diagram"
           />
         </q-card-section>
@@ -988,5 +988,17 @@ onUnmounted(() => {
   justify-content: center;
   padding: 48px;
   text-align: center;
+}
+.mermaid-container {
+  width: 100% !important;
+  min-height: 400px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.mermaid-diagram {
+  width: 100% !important;
+  height: auto !important;
 }
 </style>
