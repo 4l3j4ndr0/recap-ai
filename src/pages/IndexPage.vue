@@ -40,7 +40,7 @@ client.models.RecordingSummary.onCreate({
 }).subscribe({
   next: (data) => {
     // console.log("New recording summary created:", data);
-    recordingSummary.addRecordingSummaryListener(data);
+    recordingSummary.getRecordingSummaries();
   },
   error: (error) => console.warn(error),
 });

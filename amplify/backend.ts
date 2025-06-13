@@ -1,11 +1,15 @@
 import { defineBackend } from "@aws-amplify/backend";
+import { Stack } from "aws-cdk-lib";
 import { EventType } from "aws-cdk-lib/aws-s3";
 import { LambdaDestination } from "aws-cdk-lib/aws-s3-notifications";
+import { StartingPosition, EventSourceMapping } from "aws-cdk-lib/aws-lambda";
 import {
   PolicyStatement,
   Role,
   ServicePrincipal,
   PolicyDocument,
+  Effect,
+  Policy,
 } from "aws-cdk-lib/aws-iam";
 import { auth } from "./auth/resource";
 import { storage } from "./storage/resource";
@@ -36,18 +40,47 @@ audioFormats.forEach((suffix) => {
   );
 });
 
-backend.storage.resources.bucket.addEventNotification(
-  EventType.OBJECT_CREATED_PUT,
-  new LambdaDestination(backend.OnNewTranscriptionFunction.resources.lambda),
+const recordingSummaryTable = backend.data.resources.tables["RecordingSummary"];
+const policy = new Policy(
+  Stack.of(recordingSummaryTable),
+  "recordingSummaryTableStreamPolicy",
   {
-    prefix: "transcriptions/",
-    suffix: ".json",
+    statements: [
+      new PolicyStatement({
+        effect: Effect.ALLOW,
+        actions: [
+          "dynamodb:DescribeStream",
+          "dynamodb:GetRecords",
+          "dynamodb:GetShardIterator",
+          "dynamodb:ListStreams",
+        ],
+        resources: ["*"],
+      }),
+    ],
   },
 );
 
+backend.OnNewTranscriptionFunction.resources.lambda.role?.attachInlinePolicy(
+  policy,
+);
+backend.OnNewTranscriptionFunction.resources.lambda.role?.attachInlinePolicy(
+  policy,
+);
+
+const mapping = new EventSourceMapping(
+  Stack.of(recordingSummaryTable),
+  "RecordingSummaryStreamMapping",
+  {
+    target: backend.OnNewTranscriptionFunction.resources.lambda,
+    eventSourceArn: recordingSummaryTable.tableStreamArn,
+    startingPosition: StartingPosition.LATEST,
+  },
+);
+
+mapping.node.addDependency(policy);
 backend.OnNewRecordFunction.resources.lambda.addToRolePolicy(
   new PolicyStatement({
-    actions: ["transcribe:StartTranscriptionJob"],
+    actions: ["s3:GetObject"],
     resources: ["*"],
   }),
 );
@@ -124,4 +157,9 @@ backend.OnNewRecordFunction.resources.lambda.addToRolePolicy(
 backend.OnNewRecordFunction.addEnvironment(
   "TRANSCRIBE_ROLE_ARN",
   transcribeServiceRole.roleArn,
+);
+
+backend.OnNewRecordFunction.addEnvironment(
+  "ASSEMBLYAI_API_KEY",
+  "efb35b901d92449391b081dd4af79257",
 );

@@ -1,36 +1,22 @@
-import { Handler } from "aws-lambda";
+import { DynamoDBStreamHandler, DynamoDBRecord } from "aws-lambda";
 import type { Schema } from "../../data/resource";
 import { Amplify } from "aws-amplify";
 import { generateClient } from "aws-amplify/data";
 import { getAmplifyDataClientConfig } from "@aws-amplify/backend/function/runtime";
-import { env } from "$amplify/env/bucket-event-trigger-new-transcription";
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { env } from "$amplify/env/bucket-event-trigger-new-recording";
 import {
   BedrockRuntimeClient,
   InvokeModelCommand,
 } from "@aws-sdk/client-bedrock-runtime";
-import { LanguageCode } from "@aws-sdk/client-transcribe";
 
 const { resourceConfig, libraryOptions } =
   await getAmplifyDataClientConfig(env);
 Amplify.configure(resourceConfig, libraryOptions);
 const client = generateClient<Schema>();
 
-const s3Client = new S3Client({ region: process.env.AWS_REGION });
 const bedrockClient = new BedrockRuntimeClient({
   region: process.env.AWS_REGION,
 });
-
-interface TranscriptionResult {
-  jobName: string;
-  accountId: string;
-  status: string;
-  results: {
-    language_code: string;
-    language_identification: { code: string; score: string }[];
-    transcripts: { transcript: string }[];
-  };
-}
 
 interface BedrockResponse {
   title: string;
@@ -43,115 +29,192 @@ interface BedrockResponse {
   }[];
 }
 
+interface RecordingSummaryRecord {
+  id: string;
+  status: string;
+  transcriptionText?: string;
+  transcriptionLanguage?: string;
+  userId: string;
+  originalFileName: string;
+  transcriptionService?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 const MODEL_ID =
   process.env.MODEL_ID || "us.anthropic.claude-sonnet-4-20250514-v1:0";
 
-export const handler: Handler = async (event) => {
-  console.log("S3 Event received:", JSON.stringify(event, null, 2));
+export const handler: DynamoDBStreamHandler = async (event) => {
+  console.log(
+    "DynamoDB Stream Event received:",
+    JSON.stringify(event, null, 2),
+  );
+
+  const results: Array<{ success: boolean; recordId: string; error?: string }> =
+    [];
 
   for (const record of event.Records) {
-    try {
-      const bucketName = record.s3.bucket.name;
-      const objectKey = decodeURIComponent(
-        record.s3.object.key.replace(/\+/g, " "),
-      );
-
-      console.log(`Processing transcription file: ${objectKey}`);
-
-      // 1. Descargar el archivo JSON de transcripción desde S3
-      const transcriptionData = await downloadTranscriptionFromS3(
-        bucketName,
-        objectKey,
-      );
-
-      // 2. Extraer información necesaria
-      const languageCode = transcriptionData.results.language_code;
-      const transcriptionText =
-        transcriptionData.results.transcripts[0]?.transcript;
-      const jobName = transcriptionData.jobName;
-
-      if (!transcriptionText) {
-        console.error("No transcription text found");
-        await updateRecordingStatus(
-          jobName,
-          "FAILED",
-          "No transcription text found",
-        );
-        continue;
-      }
-
-      console.log(`Language detected: ${languageCode}`);
-      console.log(
-        `Transcription length: ${transcriptionText.length} characters`,
-      );
-
-      // 3. Actualizar estado a "GENERATING_SUMMARY"
-      await updateRecordingStatus(jobName, "GENERATING_SUMMARY");
-
-      // 4. Generar resumen con Bedrock
-      const bedrockResponse = await generateSummaryWithBedrock(
-        transcriptionText,
-        languageCode,
-      );
-
-      // 5. Actualizar registro final en DynamoDB
-      await updateRecordingWithSummary(
-        jobName,
-        transcriptionText,
-        bedrockResponse.title,
-        bedrockResponse.summary,
-        languageCode,
-        `s3://${bucketName}/${objectKey}`,
-        bedrockResponse.mermaidDiagrams || [],
-      );
-
-      console.log(`Successfully processed transcription for job: ${jobName}`);
-    } catch (error: any) {
-      console.error("Error processing transcription:", error);
-
-      // Intentar actualizar estado a FAILED si es posible
-      try {
-        const objectKey = decodeURIComponent(
-          record.s3.object.key.replace(/\+/g, " "),
-        );
-        const jobName = extractJobNameFromKey(objectKey);
-        if (jobName) {
-          await updateRecordingStatus(jobName, "FAILED", error.message);
-        }
-      } catch (updateError) {
-        console.error("Failed to update error status:", updateError);
-      }
-    }
+    const result = await processStreamRecord(record);
+    results.push(result);
   }
 
+  const successCount = results.filter((r) => r.success).length;
+  const errorCount = results.filter((r) => !r.success).length;
+
+  console.log(
+    `Stream processing completed: ${successCount} successful, ${errorCount} failed`,
+  );
+
   return {
-    statusCode: 200,
-    body: JSON.stringify({ message: "Transcription processing completed" }),
+    batchItemFailures: results
+      .filter((r) => !r.success)
+      .map((r) => ({ itemIdentifier: r.recordId })),
   };
 };
 
-async function downloadTranscriptionFromS3(
-  bucketName: string,
-  objectKey: string,
-): Promise<TranscriptionResult> {
+async function processStreamRecord(
+  record: DynamoDBRecord,
+): Promise<{ success: boolean; recordId: string; error?: string }> {
+  const recordId = record.dynamodb?.Keys?.id?.S || "unknown";
+
   try {
-    const command = new GetObjectCommand({
-      Bucket: bucketName,
-      Key: objectKey,
-    });
-
-    const response = await s3Client.send(command);
-    const jsonString = await response.Body?.transformToString();
-
-    if (!jsonString) {
-      throw new Error("Empty transcription file");
+    // Only process INSERT and MODIFY events
+    if (!record.eventName || !["INSERT", "MODIFY"].includes(record.eventName)) {
+      console.log(
+        `Skipping event type: ${record.eventName} for record: ${recordId}`,
+      );
+      return { success: true, recordId };
     }
 
-    return JSON.parse(jsonString) as TranscriptionResult;
+    // Check if this is a transcription completion event
+    const newImage = record.dynamodb?.NewImage;
+    const oldImage = record.dynamodb?.OldImage;
+
+    if (!newImage) {
+      console.log(`No new image for record: ${recordId}`);
+      return { success: true, recordId };
+    }
+
+    // Parse the DynamoDB record
+    const recordingSummary = parseDynamoDBRecord(newImage);
+
+    if (recordingSummary.status !== "TRANSCRIBING_COMPLETED") {
+      console.log(`Skipping non-completed record: ${recordId}`);
+      return { success: true, recordId };
+    }
+
+    // Check if this record should trigger summary generation
+    if (!shouldGenerateSummary(recordingSummary, oldImage)) {
+      console.log(`Record ${recordId} does not require summary generation`);
+      return { success: true, recordId };
+    }
+
+    console.log(`Processing summary generation for record: ${recordId}`);
+
+    // Validate required fields
+    if (
+      !recordingSummary.transcriptionText ||
+      recordingSummary.transcriptionText.trim().length === 0
+    ) {
+      console.error(`No transcription text found for record: ${recordId}`);
+      await updateRecordingStatus(
+        recordId,
+        "FAILED",
+        "No transcription text available",
+      );
+      return { success: false, recordId, error: "No transcription text" };
+    }
+
+    // Update status to GENERATING_SUMMARY
+    await updateRecordingStatus(recordId, "GENERATING_SUMMARY");
+
+    // Generate summary with Bedrock
+    const bedrockResponse = await generateSummaryWithBedrock(
+      recordingSummary.transcriptionText,
+      recordingSummary.transcriptionLanguage || "en-US",
+    );
+
+    // Update record with summary
+    await updateRecordingWithSummary(
+      recordId,
+      bedrockResponse.title,
+      bedrockResponse.summary,
+      bedrockResponse.mermaidDiagrams || [],
+    );
+
+    console.log(`Successfully generated summary for record: ${recordId}`);
+    return { success: true, recordId };
   } catch (error: any) {
-    console.error("Error downloading transcription from S3:", error);
-    throw new Error(`Failed to download transcription: ${error.message}`);
+    console.error(`Error processing stream record ${recordId}:`, error);
+
+    // Try to update status to FAILED
+    try {
+      await updateRecordingStatus(recordId, "FAILED", error.message);
+    } catch (updateError) {
+      console.error(
+        `Failed to update error status for record ${recordId}:`,
+        updateError,
+      );
+    }
+
+    return {
+      success: false,
+      recordId,
+      error: error.message || "Unknown error",
+    };
   }
+}
+
+function parseDynamoDBRecord(newImage: any): RecordingSummaryRecord {
+  return {
+    id: newImage.id?.S || "",
+    status: newImage.status?.S || "",
+    transcriptionText: newImage.transcriptionText?.S || "",
+    transcriptionLanguage:
+      newImage.transcriptionLanguage?.S || newImage.languageCode?.S || "en-US",
+    userId: newImage.userId?.S || "",
+    originalFileName: newImage.originalFileName?.S || "",
+    transcriptionService: newImage.transcriptionService?.S || "",
+    createdAt: newImage.createdAt?.S || "",
+    updatedAt: newImage.updatedAt?.S || "",
+  };
+}
+
+function shouldGenerateSummary(
+  newRecord: RecordingSummaryRecord,
+  oldImage?: any,
+): boolean {
+  // Check if status changed to COMPLETED and we have transcription text
+  const newStatus = newRecord.status;
+  const oldStatus = oldImage?.status?.S || "";
+
+  // Generate summary when:
+  // 1. Status is COMPLETED and we have transcription text
+  // 2. Status changed from something else to COMPLETED
+  // 3. Record doesn't already have a summary
+  const hasTranscription = Boolean(
+    newRecord.transcriptionText &&
+      newRecord.transcriptionText.trim().length > 0,
+  );
+  const isCompleted = newStatus === "TRANSCRIBING_COMPLETED";
+  const statusChanged = oldStatus !== newStatus;
+  const hasExistingSummary = Boolean(
+    oldImage?.summaryTitle?.S && oldImage?.summaryMarkdown?.S,
+  );
+
+  const shouldGenerate: boolean =
+    isCompleted && hasTranscription && !hasExistingSummary;
+
+  console.log(`Summary generation check for ${newRecord.id}:`, {
+    newStatus,
+    oldStatus,
+    hasTranscription: !!hasTranscription,
+    statusChanged,
+    hasExistingSummary: !!hasExistingSummary,
+    shouldGenerate,
+  });
+
+  return shouldGenerate;
 }
 
 async function generateSummaryWithBedrock(
@@ -161,6 +224,10 @@ async function generateSummaryWithBedrock(
   const prompt = createSummaryPrompt(transcriptionText, languageCode);
 
   try {
+    console.log(
+      `Generating summary with Bedrock for ${transcriptionText.length} characters of text`,
+    );
+
     const command = new InvokeModelCommand({
       modelId: MODEL_ID,
       contentType: "application/json",
@@ -184,7 +251,7 @@ async function generateSummaryWithBedrock(
 
     // Claude estructura: responseBody.content[0].text
     const content = responseBody.content[0].text;
-    console.log("Claude response content:", content);
+    console.log("Claude response received, length:", content.length);
 
     return parseBedrockResponse(content);
   } catch (error: any) {
@@ -195,7 +262,7 @@ async function generateSummaryWithBedrock(
 
 function parseBedrockResponse(content: string): BedrockResponse {
   try {
-    console.log("Raw content to parse:", content);
+    console.log("Parsing Bedrock response...");
 
     // Claude a menudo envuelve JSON en bloques de código
     let jsonString = content.trim();
@@ -207,15 +274,9 @@ function parseBedrockResponse(content: string): BedrockResponse {
       jsonString = jsonString.replace(/^```\s*/, "").replace(/\s*```$/, "");
     }
 
-    console.log("Cleaned JSON string:", jsonString);
-
     const parsedResponse = JSON.parse(jsonString);
 
-    if (
-      parsedResponse.title &&
-      parsedResponse.summary &&
-      parsedResponse.mermaidDiagrams
-    ) {
+    if (parsedResponse.title && parsedResponse.summary) {
       return {
         title: parsedResponse.title.substring(0, 200),
         summary: parsedResponse.summary,
@@ -309,63 +370,6 @@ Respond only with valid JSON using this exact structure:
   ]
 }
 
-SAFE MERMAID EXAMPLES:
-
-Flowchart (CORRECT):
-\`\`\`
-flowchart TD
-    START[Process Start] --> REVIEW{Review Required}
-    REVIEW -->|Yes| APPROVE[Send for Approval]
-    REVIEW -->|No| EXECUTE[Execute Directly]
-    APPROVE --> WAIT[Wait for Response]
-    WAIT --> DECISION{Approved}
-    DECISION -->|Yes| EXECUTE
-    DECISION -->|No| REJECT[Request Rejected]
-    EXECUTE --> END[Process Complete]
-    REJECT --> END
-\`\`\`
-
-Timeline (CORRECT):
-\`\`\`
-timeline
-    title Project Development Timeline
-    2024-Q1 : Planning Phase
-             : Requirements Gathering
-    2024-Q2 : Development Phase
-             : Implementation Start
-    2024-Q3 : Testing Phase
-             : Quality Assurance
-    2024-Q4 : Deployment Phase
-             : Production Release
-\`\`\`
-
-Sequence Diagram (CORRECT):
-\`\`\`
-sequenceDiagram
-    participant USER as User
-    participant API as API Gateway
-    participant DB as Database
-    
-    USER ->> API: Send Request
-    API ->> DB: Query Data
-    DB -->> API: Return Results
-    API -->> USER: Send Response
-\`\`\`
-
-FORBIDDEN PATTERNS (WILL CAUSE ERRORS):
-❌ Node labels with accents: [Creación], [Configuración]
-❌ Special characters: [User@Company], [Cost ($100)]
-❌ Quotes in labels: ["User Input"], ['System Response']
-❌ Complex symbols: [Stage #1], [Phase 50%]
-❌ Parentheses in labels: [Review (Stage 1)]
-
-SAFE ALTERNATIVES:
-✅ Use: [Creation], [Configuration]  
-✅ Use: [User at Company], [Cost 100 USD]
-✅ Use: [User Input], [System Response]
-✅ Use: [Stage 1], [Phase 50 Percent]
-✅ Use: [Review Stage 1]
-
 REQUIREMENTS:
 - Title must be specific and descriptive (max 80 characters) in ${language}
 - Summary must be in ${language}
@@ -387,7 +391,7 @@ Respond ONLY with the requested JSON, no additional text before or after.`;
 }
 
 async function updateRecordingStatus(
-  jobName: string,
+  recordId: string,
   status: string,
   errorMessage?: string,
 ) {
@@ -403,7 +407,7 @@ async function updateRecordingStatus(
     }
 
     const { errors } = await client.models.RecordingSummary.update({
-      id: jobName,
+      id: recordId,
       ...updateData,
     });
 
@@ -412,7 +416,9 @@ async function updateRecordingStatus(
       throw new Error("Failed to update recording status");
     }
 
-    console.log(`Recording status updated to ${status} for job: ${jobName}`);
+    console.log(
+      `Recording status updated to ${status} for record: ${recordId}`,
+    );
   } catch (error) {
     console.error("Error updating recording status:", error);
     throw error;
@@ -420,26 +426,22 @@ async function updateRecordingStatus(
 }
 
 async function updateRecordingWithSummary(
-  jobName: string,
-  transcriptionText: string,
+  recordId: string,
   summaryTitle: string,
   summaryMarkdown: string,
-  languageCode: string,
-  transcriptionS3Uri: string,
   mermaidDiagrams: any[] = [],
 ) {
   try {
     const { errors } = await client.models.RecordingSummary.update({
-      id: jobName,
-      status: "COMPLETED" as any,
-      transcriptionText: transcriptionText,
+      id: recordId,
+      status: "COMPLETED",
       summaryTitle: summaryTitle,
       summaryMarkdown: summaryMarkdown,
-      languageCode: languageCode,
-      transcriptionS3Uri: transcriptionS3Uri,
       llmModel: MODEL_ID,
       updatedAt: new Date().toISOString(),
-      mermaidDiagram: JSON.stringify(mermaidDiagrams),
+      ...(mermaidDiagrams.length > 0 && {
+        mermaidDiagram: JSON.stringify(mermaidDiagrams),
+      }),
     });
 
     if (errors) {
@@ -447,17 +449,9 @@ async function updateRecordingWithSummary(
       throw new Error("Failed to update recording with summary");
     }
 
-    console.log(`Recording summary completed for job: ${jobName}`);
+    console.log(`Recording updated with summary for record: ${recordId}`);
   } catch (error) {
     console.error("Error updating recording with summary:", error);
     throw error;
   }
-}
-
-function extractJobNameFromKey(objectKey: string): string | null {
-  // Asumiendo que el objectKey contiene el jobName
-  // Ejemplo: "transcriptions/jobName.json"
-  const parts = objectKey.split("/");
-  const filename = parts[parts.length - 1];
-  return filename.replace(".json", "");
 }

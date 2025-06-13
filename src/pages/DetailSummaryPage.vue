@@ -154,6 +154,15 @@
                 </div>
 
                 <div class="info-item">
+                  <span class="label">Duration:</span>
+                  <span class="value">{{
+                    formatAudioDuration(
+                      recordingSummary.recordingSummary?.audioDuration,
+                    )
+                  }}</span>
+                </div>
+
+                <div class="info-item">
                   <span class="label">Created:</span>
                   <span class="value">{{
                     formatDate(recordingSummary.recordingSummary?.createdAt)
@@ -167,16 +176,6 @@
                     "Auto-detected"
                   }}</span>
                 </div>
-
-                <!-- <div class="info-item">
-                  <span class="label">Quality:</span>
-                  <q-rating
-                    v-model="recording.quality"
-                    readonly
-                    size="sm"
-                    color="amber"
-                  />
-                </div> -->
               </div>
             </q-card-section>
           </q-card>
@@ -438,6 +437,7 @@ const loadRecording = async () => {
     isLoading.value = true;
     const recordingId = props.recordingId || route.params.recordingId;
     await recordingSummary.getRecordSummaryById(recordingId);
+    duration.value = recordingSummary.recordingSummary?.audioDuration;
   } catch (error) {
     console.error("Error loading recording:", error);
     showNoty("error", "Failed to load recording details");
@@ -452,9 +452,10 @@ const playAudio = async () => {
       const audioUrl = await generalStore.getAudioSignedUrl(
         recordingSummary.recordingSummary?.s3Uri,
       );
+
       currentAudio.value = new Audio(audioUrl);
       currentAudio.value.addEventListener("loadedmetadata", () => {
-        duration.value = currentAudio.value.duration;
+        duration.value = recordingSummary.recordingSummary?.audioDuration;
       });
       currentAudio.value.addEventListener("timeupdate", () => {
         currentTime.value = currentAudio.value.currentTime;
@@ -599,6 +600,20 @@ const getDiagramIcon = (type) => {
 const expandDiagram = (diagram) => {
   selectedDiagram.value = diagram;
   modalDiagramRef.value = true;
+};
+
+const formatAudioDuration = (seconds) => {
+  if (!seconds || seconds < 0) return "0:00";
+
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  } else {
+    return `${minutes}:${secs.toString().padStart(2, "0")}`;
+  }
 };
 
 // Lifecycle

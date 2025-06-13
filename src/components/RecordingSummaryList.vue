@@ -130,8 +130,8 @@
                   <div class="recording-meta text-caption text-grey-6">
                     {{ formatDate(recording.createdAt) }} •
                     {{ recording.languageCode || "es-ES" }}
-                    <span v-if="recording.duration">
-                      • {{ recording.duration }}</span
+                    <span v-if="recording.audioDuration">
+                      • {{ recording.audioDuration }}</span
                     >
                   </div>
                 </div>
@@ -153,7 +153,10 @@
           <q-card>
             <q-card-section>
               <q-card-section
-                v-if="recording.transcriptionText || recording.summaryMarkdown"
+                v-if="
+                  (recording.transcriptionText || recording.summaryMarkdown) &&
+                  recording.status === 'COMPLETED'
+                "
               >
                 <!-- Transcripción -->
                 <div v-if="recording.transcriptionText" class="q-mb-md">
@@ -349,6 +352,7 @@ const audioPlayer = ref(null);
 const statusOptions = [
   { label: "All", value: "all" },
   { label: "Processing", value: "TRANSCRIBING" },
+  { label: "Transcribe completed", value: "TRANSCRIBING_COMPLETED" },
   { label: "Completed", value: "COMPLETED" },
   { label: "Failed", value: "FAILED" },
 ];
@@ -462,6 +466,7 @@ const formatDate = (dateString) => {
 const getStatusColor = (status) => {
   const colors = {
     TRANSCRIBING: "orange",
+    TRANSCRIBING_COMPLETED: "blue",
     COMPLETED: "positive",
     FAILED: "negative",
   };
@@ -471,6 +476,7 @@ const getStatusColor = (status) => {
 const getStatusIcon = (status) => {
   const icons = {
     TRANSCRIBING: "hourglass_empty",
+    TRANSCRIBING_COMPLETED: "transcribe",
     COMPLETED: "check_circle",
     FAILED: "error",
   };
@@ -482,6 +488,7 @@ const getStatusLabel = (status) => {
     TRANSCRIBING: "Processing",
     COMPLETED: "Completed",
     FAILED: "Failed",
+    TRANSCRIBING_COMPLETED: "Transcribe completed",
   };
   return labels[status] || status;
 };

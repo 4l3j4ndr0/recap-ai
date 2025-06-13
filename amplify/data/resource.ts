@@ -13,13 +13,16 @@ const schema = a
           "COMPLETED",
           "FAILED",
           "TRANSCRIBING",
+          "TRANSCRIBING_COMPLETED",
           "GENERATING_SUMMARY",
+          "ERROR",
         ]),
 
         // Información del archivo original
         originalFileName: a.string().required(),
         s3Uri: a.string().required(), // URI del archivo de audio en S3
-
+        audioDuration: a.float(), // Duración del audio en segundos
+        confidenceScore: a.float(), // Puntuación de confianza de la transcripción
         // Contenido del resumen generado por LLM (en formato Markdown)
         summaryMarkdown: a.string(), // Contenido completo del resumen en Markdown
         mermaidDiagram: a.string(), // Diagrama Mermaid generado
@@ -29,8 +32,6 @@ const schema = a
 
         // Metadatos del archivo
         fileSize: a.integer(),
-        duration: a.float(), // duración en segundos
-        mimeType: a.string(),
 
         // Información de error
         errorMessage: a.string(),

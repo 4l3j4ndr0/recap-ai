@@ -12,17 +12,6 @@ export const useRecordingSummaryStore = defineStore("recording-summary", {
   }),
 
   actions: {
-    addRecordingSummaryListener(recordingSummary: any) {
-      // Verificar si ya existe un resumen con el mismo ID
-      const existingIndex = this.recordingSummaries.findIndex(
-        (summary) => summary.id === recordingSummary.id,
-      );
-      if (existingIndex !== -1) {
-        // Si ya existe, actualizarlo
-        this.recordingSummaries[existingIndex] = recordingSummary;
-        return;
-      }
-    },
     updateRecordyngSummaryListener(recordingSummary: any) {
       const index = this.recordingSummaries.findIndex(
         (summary) => summary.id === recordingSummary.id,
