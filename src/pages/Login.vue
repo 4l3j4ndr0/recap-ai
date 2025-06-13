@@ -26,7 +26,7 @@
               </q-card-section>
 
               <q-card-section class="login-form">
-                <authenticator :hide-sign-up="false">
+                <authenticator :hide-sign-up="true">
                   <template v-slot:header>
                     <!-- Header personalizado ya está arriba -->
                   </template>
