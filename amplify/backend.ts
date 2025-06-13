@@ -1,4 +1,4 @@
-import { defineBackend } from "@aws-amplify/backend";
+import { defineBackend, secret } from "@aws-amplify/backend";
 import { Stack } from "aws-cdk-lib";
 import { EventType } from "aws-cdk-lib/aws-s3";
 import { LambdaDestination } from "aws-cdk-lib/aws-s3-notifications";
@@ -161,5 +161,5 @@ backend.OnNewRecordFunction.addEnvironment(
 
 backend.OnNewRecordFunction.addEnvironment(
   "ASSEMBLYAI_API_KEY",
-  "efb35b901d92449391b081dd4af79257",
+  secret("ASSEMBLYAI_API_KEY"),
 );
