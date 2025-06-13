@@ -22,6 +22,12 @@ RecapAI is a **truly serverless solution** that scales automatically based on de
 
 AWS Lambda orchestrates the entire intelligent processing pipeline through specialized functions that work in perfect harmony:
 
+## Infrastructure Diagram
+
+<div align="center">
+  <img src="./assets/RecapAI.png" alt="RecapAI Dashboard" width="800"/>
+</div>
+
 ### 🔧 Core Lambda Functions
 
 | Function                     | Purpose                                       | Trigger           |
