@@ -6,4 +6,5 @@ export const OnNewTranscriptionFunction = defineFunction({
   timeoutSeconds: 300,
   memoryMB: 2048,
   ephemeralStorageSizeMB: 1024,
+  resourceGroupName: "data",
 });
