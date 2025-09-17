@@ -228,29 +228,55 @@ async function generateSummaryWithBedrock(
       `Generating summary with Bedrock for ${transcriptionText.length} characters of text`,
     );
 
-    const command = new InvokeModelCommand({
-      modelId: MODEL_ID,
-      contentType: "application/json",
-      accept: "application/json",
-      body: JSON.stringify({
-        anthropic_version: "bedrock-2023-05-31",
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        max_tokens: 4000,
-        temperature: 0.3,
-        top_p: 0.9,
-      }),
-    });
+    const command = MODEL_ID.includes("anthropic")
+      ? new InvokeModelCommand({
+          modelId: MODEL_ID,
+          contentType: "application/json",
+          accept: "application/json",
+          body: JSON.stringify({
+            anthropic_version: "bedrock-2023-05-31",
+            messages: [
+              {
+                role: "user",
+                content: prompt,
+              },
+            ],
+            max_tokens: 4000,
+            temperature: 0.3,
+            top_p: 0.9,
+          }),
+        })
+      : new InvokeModelCommand({
+          modelId: MODEL_ID,
+          contentType: "application/json",
+          accept: "application/json",
+          body: JSON.stringify({
+            messages: [
+              {
+                role: "user",
+                content: [
+                  {
+                    text: prompt,
+                  },
+                ],
+              },
+            ],
+            inferenceConfig: {
+              maxTokens: 4000,
+              temperature: 0.3,
+            },
+          }),
+        });
 
     const response = await bedrockClient.send(command);
     const responseBody = JSON.parse(new TextDecoder().decode(response.body));
 
     // Claude estructura: responseBody.content[0].text
-    const content = responseBody.content[0].text;
+    console.log("RESPONSE BODY", responseBody);
+
+    const content = MODEL_ID.includes("anthropic")
+      ? responseBody.content[0].text
+      : responseBody.output.message.content[0].text;
     console.log("Claude response received, length:", content.length);
 
     return parseBedrockResponse(content);

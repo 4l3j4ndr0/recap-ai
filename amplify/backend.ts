@@ -101,7 +101,7 @@ backend.OnNewTranscriptionFunction.resources.lambda.addToRolePolicy(
 
 backend.OnNewTranscriptionFunction.addEnvironment(
   "MODEL_ID",
-  "us.anthropic.claude-sonnet-4-20250514-v1:0",
+  "us.amazon.nova-premier-v1:0",
 );
 
 const customResourcesStack = backend.createStack("custom-resources-stack");
