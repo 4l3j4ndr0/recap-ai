@@ -4,7 +4,7 @@
       :class="['recording-btn', { 'recording-active': isRecording }]"
       :color="isRecording ? 'negative' : 'secondary'"
       :icon="isRecording ? 'stop' : 'mic'"
-      :label="isRecording ? 'Stop Recording' : 'New Recording'"
+      :label="isRecording ? 'Stop Recording' : 'New Meeting Recording'"
       size="lg"
       no-caps
       @click="toggleRecording"

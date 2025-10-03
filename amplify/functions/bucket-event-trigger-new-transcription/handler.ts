@@ -243,7 +243,7 @@ async function generateSummaryWithBedrock(
             ],
             max_tokens: 4000,
             temperature: 0.3,
-            top_p: 0.9,
+            // top_p: 0.9,
           }),
         })
       : new InvokeModelCommand({

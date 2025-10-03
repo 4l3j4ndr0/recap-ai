@@ -5,12 +5,58 @@
       <q-toolbar class="toolbar-container">
         <!-- Logo y marca -->
         <div class="brand-section">
-          <q-avatar square size="40px" class="brand-logo">
-            <img src="icon.png" alt="Recap AI Logo" />
-          </q-avatar>
+          <div class="brand-logo-svg">
+            <svg width="60" height="60" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="micGradientHeader" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+                  <stop offset="100%" style="stop-color:#f0f9ff;stop-opacity:1" />
+                </linearGradient>
+                
+                <linearGradient id="waveGradientHeader" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" style="stop-color:#4ade80;stop-opacity:1" />
+                  <stop offset="50%" style="stop-color:#38bdf8;stop-opacity:1" />
+                  <stop offset="100%" style="stop-color:#c084fc;stop-opacity:1" />
+                </linearGradient>
+                
+                <linearGradient id="aiGradientHeader" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style="stop-color:#fb923c;stop-opacity:1" />
+                  <stop offset="100%" style="stop-color:#f97316;stop-opacity:1" />
+                </linearGradient>
+              </defs>
+              
+              <!-- Micrófono principal -->
+              <g transform="translate(60,60)">
+                <rect x="-8" y="-25" width="16" height="30" rx="8" fill="url(#micGradientHeader)" stroke="#e2e8f0" stroke-width="1"/>
+                <rect x="-12" y="8" width="24" height="4" rx="2" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+                <rect x="-6" y="12" width="12" height="8" rx="1" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+                <circle cx="0" cy="-15" r="2" fill="#64748b" opacity="0.6"/>
+                <rect x="-6" y="-5" width="12" height="1" fill="#64748b" opacity="0.4"/>
+                <rect x="-6" y="0" width="12" height="1" fill="#64748b" opacity="0.4"/>
+              </g>
+              
+              <!-- Símbolo AI -->
+              <g transform="translate(85,35)">
+                <polygon points="0,-6 5,-3 5,3 0,6 -5,3 -5,-3" fill="url(#aiGradientHeader)" stroke="#ffffff" stroke-width="0.5">
+                  <animateTransform attributeName="transform" type="rotate" values="0;360" dur="8s" repeatCount="indefinite"/>
+                </polygon>
+                <text x="0" y="1" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="4" font-weight="bold">AI</text>
+              </g>
+              
+              <!-- Ondas simplificadas -->
+              <g opacity="1">
+                <path d="M 85 45 Q 95 60 85 75" stroke="url(#waveGradientHeader)" stroke-width="3" fill="none" stroke-linecap="round">
+                  <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite"/>
+                </path>
+                <path d="M 90 40 Q 105 60 90 80" stroke="url(#waveGradientHeader)" stroke-width="2" fill="none" stroke-linecap="round">
+                  <animate attributeName="opacity" values="0.4;0.8;0.4" dur="2s" begin="0.5s" repeatCount="indefinite"/>
+                </path>
+              </g>
+            </svg>
+          </div>
           <div class="brand-text">
-            <div class="brand-name">Recap AI</div>
-            <div class="brand-tagline">Smart Meeting Insights</div>
+            <div class="brand-name">Recap<span class="brand-ai">AI</span></div>
+            <div class="brand-tagline">Meeting Intelligence Platform</div>
           </div>
         </div>
 
@@ -148,9 +194,14 @@ const closeSession = async () => {
   gap: 12px;
 }
 
-.brand-logo {
+.brand-logo-svg {
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 4px;
+  transition: transform 0.3s ease;
+}
+
+.brand-logo-svg:hover {
+  transform: scale(1.05);
 }
 
 .brand-text {
@@ -164,6 +215,15 @@ const closeSession = async () => {
   font-weight: 700;
   color: white;
   line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.brand-ai {
+  color: #FF6B35;
+  background: linear-gradient(135deg, #FF6B35 0%, #9C27B0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .brand-tagline {
@@ -171,6 +231,8 @@ const closeSession = async () => {
   color: rgba(255, 255, 255, 0.7);
   font-weight: 400;
   line-height: 1;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 /* Sección de usuario */

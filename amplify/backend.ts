@@ -27,7 +27,18 @@ const backend = defineBackend({
   data,
 });
 
-const audioFormats = [".mp3", ".webm", ".wav", ".m4a", ".ogg", ".flac"];
+const audioFormats = [
+  ".mp3",
+  ".webm",
+  ".wav",
+  ".m4a",
+  ".ogg",
+  ".flac",
+  ".mp4",
+  ".mov",
+  ".avi",
+  ".mkv",
+];
 
 audioFormats.forEach((suffix) => {
   backend.storage.resources.bucket.addEventNotification(
@@ -101,7 +112,7 @@ backend.OnNewTranscriptionFunction.resources.lambda.addToRolePolicy(
 
 backend.OnNewTranscriptionFunction.addEnvironment(
   "MODEL_ID",
-  "us.amazon.nova-premier-v1:0",
+  "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
 );
 
 const customResourcesStack = backend.createStack("custom-resources-stack");

@@ -1,12 +1,15 @@
 <template>
   <q-layout>
     <div class="q-pa-md">
-      <RecordingButton
-        ref="recordingButtonRef"
-        @recording-started="onRecordingStarted"
-        @recording-stopped="onRecordingStopped"
-        @recording-error="onRecordingError"
-      />
+      <div class="row q-gutter-md justify-center">
+        <RecordingButton
+          ref="recordingButtonRef"
+          @recording-started="onRecordingStarted"
+          @recording-stopped="onRecordingStopped"
+          @recording-error="onRecordingError"
+        />
+        <FileUploadButton />
+      </div>
     </div>
     <!-- Lista de recordings -->
     <RecordingSummaryList />
@@ -17,6 +20,7 @@
 import { useGeneralStore } from "../../src/stores/General";
 import { useUserStore } from "../../src/stores/User";
 import RecordingButton from "../components/RecordingButton.vue";
+import FileUploadButton from "../components/FileUploadButton.vue";
 import RecordingSummaryList from "../components/RecordingSummaryList.vue";
 import { useRecordingSummaryStore } from "../../src/stores/RecordingSumary";
 import { generateClient } from "aws-amplify/data";
