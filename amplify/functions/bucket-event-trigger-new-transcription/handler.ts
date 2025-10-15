@@ -381,8 +381,9 @@ MERMAID DIAGRAM GUIDELINES:
 - Maximum 15 nodes per diagram to maintain clarity
 - Always validate arrow syntax: --> for solid arrows, -.-> for dotted arrows
 
-REQUIRED RESPONSE FORMAT:
-Respond only with valid JSON using this exact structure:
+CRITICAL: You MUST respond with ONLY valid JSON. No explanations, no markdown blocks, no additional text.
+
+REQUIRED JSON STRUCTURE - COPY THIS EXACTLY:
 {
   "title": "Descriptive and specific content title",
   "summary": "Markdown formatted summary in ${language}",
@@ -413,7 +414,7 @@ REQUIREMENTS:
 - If uncertain about syntax, omit the diagram rather than risk errors
 - If no diagrams are applicable, return an empty array for mermaidDiagrams
 
-Respond ONLY with the requested JSON, no additional text before or after.`;
+RESPOND WITH ONLY THE JSON OBJECT - START WITH { AND END WITH }`;
 }
 
 async function updateRecordingStatus(
