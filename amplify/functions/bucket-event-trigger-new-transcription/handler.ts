@@ -381,9 +381,15 @@ MERMAID DIAGRAM GUIDELINES:
 - Maximum 15 nodes per diagram to maintain clarity
 - Always validate arrow syntax: --> for solid arrows, -.-> for dotted arrows
 
-CRITICAL: You MUST respond with ONLY valid JSON. No explanations, no markdown blocks, no additional text.
+CRITICAL OUTPUT FORMAT: 
+- Start your response immediately with { 
+- End your response with }
+- NO markdown code blocks
+- NO explanations before or after the JSON
+- NO additional text whatsoever
+- ONLY the raw JSON object
 
-REQUIRED JSON STRUCTURE - COPY THIS EXACTLY:
+REQUIRED JSON STRUCTURE:
 {
   "title": "Descriptive and specific content title",
   "summary": "Markdown formatted summary in ${language}",
