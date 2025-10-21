@@ -38,3 +38,5 @@ yarn-error.log*
 .env.local*
 amplify_*.json
 .vscode
+# Chat history
+recap-ai-chat

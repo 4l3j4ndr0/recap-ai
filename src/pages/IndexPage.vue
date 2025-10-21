@@ -33,7 +33,7 @@ const recordingSummary = useRecordingSummaryStore();
 //@ts-ignore
 import mixin from "../mixins/mixin";
 
-const { showNoty } = mixin();
+const { showNoty, showLoading, hideLoading } = mixin();
 
 const client = generateClient<Schema>();
 client.models.RecordingSummary.onCreate({
@@ -72,6 +72,7 @@ const onRecordingStopped = async (audioBlob: any, duration: string) => {
   if (!validateRecordingMinDUration(duration)) {
     return;
   }
+  showLoading("Uploading audio...");
   const result = await general.uploadAudioToS3(audioBlob, user.userId);
   result.success
     ? showNoty(
@@ -83,6 +84,7 @@ const onRecordingStopped = async (audioBlob: any, duration: string) => {
         "There was an error uploading the audio. Please try again.",
       );
 
+  hideLoading();
   const audioUrl = URL.createObjectURL(audioBlob);
   console.log("Audio URL:", audioUrl);
 };
