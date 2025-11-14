@@ -50,7 +50,11 @@ const schema = a
         isArchived: a.boolean().default(false),
         isFavorite: a.boolean().default(false),
       })
-      .secondaryIndexes((index) => [index("userId").queryField("listByUserId")])
+      .secondaryIndexes((index) => [
+        index("userId")
+          .sortKeys(["createdAt"])
+          .queryField("listByUserId")
+      ])
       .authorization((allow) => [
         allow.authenticated().to(["list", "listen", "update", "delete", "get"]),
       ]),

@@ -9,6 +9,9 @@ export const useRecordingSummaryStore = defineStore("recording-summary", {
   state: () => ({
     recordingSummaries: [] as any[],
     recordingSummary: null as any | null,
+    nextToken: null as string | null,
+    limitSummary: 25,
+    sortDirection: "DESC" as "ASC" | "DESC",
   }),
 
   actions: {
@@ -28,15 +31,26 @@ export const useRecordingSummaryStore = defineStore("recording-summary", {
     resetRecordingSummary() {
       this.recordingSummary = null;
     },
-    async getRecordingSummaries() {
+    setSortDirection(direction: "ASC" | "DESC") {
+      this.sortDirection = direction;
+      this.nextToken = null;
+    },
+    async getRecordingSummaries(refresh: boolean = false) {
       try {
-        // Mover la inicialización del store aquí, dentro de la action
         const user = useUserStore();
 
-        const { data, errors } =
-          await client.models.RecordingSummary.listByUserId({
-            userId: user.userId,
-          });
+        const { data, nextToken, errors } =
+          await client.models.RecordingSummary.listByUserId(
+            { userId: user.userId },
+            {
+              limit: this.limitSummary,
+              nextToken:
+                !refresh && this.nextToken ? this.nextToken : undefined,
+              sortDirection: this.sortDirection,
+            },
+          );
+
+        this.nextToken = nextToken || null;
 
         if (errors && errors.length > 0) {
           throw new Error(errors[0].message);
@@ -53,6 +67,44 @@ export const useRecordingSummaryStore = defineStore("recording-summary", {
         return {
           error: true,
           message: err.message || "Error fetching recording summaries",
+        };
+      }
+    },
+    async loadMoreRecordingSummaries() {
+      if (!this.nextToken) {
+        return { error: false, message: "No more data" };
+      }
+
+      try {
+        const user = useUserStore();
+
+        const { data, nextToken, errors } =
+          await client.models.RecordingSummary.listByUserId(
+            { userId: user.userId },
+            {
+              limit: this.limitSummary,
+              nextToken: this.nextToken,
+              sortDirection: this.sortDirection,
+            },
+          );
+
+        this.nextToken = nextToken || null;
+
+        if (errors && errors.length > 0) {
+          throw new Error(errors[0].message);
+        }
+
+        this.recordingSummaries = [...this.recordingSummaries, ...(data || [])];
+
+        return {
+          error: false,
+          message: "More summaries loaded",
+          data: this.recordingSummaries,
+        };
+      } catch (err: any) {
+        return {
+          error: true,
+          message: err.message || "Error loading more summaries",
         };
       }
     },

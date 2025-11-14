@@ -108,7 +108,6 @@
     </div>
 
     <!-- Lista de recordings -->
-
     <div class="recordings-grid">
       <q-card
         v-for="recording in filteredRecordings"
@@ -301,6 +300,21 @@
       </q-card>
     </div>
 
+    <!-- Load More button -->
+    <div
+      v-if="recordingStore.nextToken && !isLoading"
+      class="row justify-center q-my-lg"
+    >
+      <q-btn
+        @click="loadMoreRecordings"
+        color="primary"
+        outline
+        icon="expand_more"
+        label="Load More"
+        :loading="isLoadingMore"
+      />
+    </div>
+
     <!-- Estado vacío -->
     <div
       v-if="!isLoading && filteredRecordings.length === 0"
@@ -342,6 +356,7 @@ const router = useRouter();
 
 // Estado reactivo
 const isLoading = ref(false);
+const isLoadingMore = ref(false);
 const searchQuery = ref("");
 const statusFilter = ref("all");
 const sortBy = ref("newest");
@@ -360,8 +375,6 @@ const statusOptions = [
 const sortOptions = [
   { label: "Newest first", value: "newest" },
   { label: "Oldest first", value: "oldest" },
-  { label: "Name A-Z", value: "name-asc" },
-  { label: "Name Z-A", value: "name-desc" },
 ];
 
 import { useQuasar } from "quasar";
@@ -410,38 +423,28 @@ const filteredRecordings = computed(() => {
     );
   }
 
-  // Ordenamiento
-  filtered = [...filtered].sort((a, b) => {
-    switch (sortBy.value) {
-      case "newest":
-        return (
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-      case "oldest":
-        return (
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-        );
-      case "name-asc":
-        return (a.originalFileName || "").localeCompare(
-          b.originalFileName || "",
-        );
-      case "name-desc":
-        return (b.originalFileName || "").localeCompare(
-          a.originalFileName || "",
-        );
-      default:
-        return 0;
-    }
-  });
-
   return filtered;
 });
 
 // Métodos
+const loadMoreRecordings = async () => {
+  isLoadingMore.value = true;
+  try {
+    const result = await recordingStore.loadMoreRecordingSummaries();
+    if (result.error) {
+      showNoty("error", result.message);
+    }
+  } catch (error) {
+    showNoty("error", "Error loading more recordings");
+  } finally {
+    isLoadingMore.value = false;
+  }
+};
+
 const refreshRecordings = async () => {
   isLoading.value = true;
   try {
-    const result = await recordingStore.getRecordingSummaries();
+    const result = await recordingStore.getRecordingSummaries(true);
     if (result.error) {
       showNoty("error", result.message);
     }
@@ -607,6 +610,16 @@ watch(
     }
   },
 );
+
+// Watch para cambios en sortBy
+watch(sortBy, async (newValue) => {
+  if (newValue === "newest") {
+    recordingStore.setSortDirection("DESC");
+  } else if (newValue === "oldest") {
+    recordingStore.setSortDirection("ASC");
+  }
+  await refreshRecordings();
+});
 </script>
 
 <style scoped>
