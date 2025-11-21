@@ -12,6 +12,10 @@ export const useRecordingSummaryStore = defineStore("recording-summary", {
     nextToken: null as string | null,
     limitSummary: 25,
     sortDirection: "DESC" as "ASC" | "DESC",
+    metrics: {
+      totalSummaries: 0,
+      totalMinutes: 0,
+    },
   }),
 
   actions: {
@@ -35,7 +39,7 @@ export const useRecordingSummaryStore = defineStore("recording-summary", {
       this.sortDirection = direction;
       this.nextToken = null;
     },
-    async getRecordingSummaries(refresh: boolean = false) {
+    async getRecordingSummaries() {
       try {
         const user = useUserStore();
 
@@ -44,8 +48,6 @@ export const useRecordingSummaryStore = defineStore("recording-summary", {
             { userId: user.userId },
             {
               limit: this.limitSummary,
-              nextToken:
-                !refresh && this.nextToken ? this.nextToken : undefined,
               sortDirection: this.sortDirection,
             },
           );
@@ -159,6 +161,26 @@ export const useRecordingSummaryStore = defineStore("recording-summary", {
           message: err.message || "Error deleting recording summary",
         };
       }
+    },
+    calculateMonthlyMetrics() {
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+
+      const monthlyRecordings = this.recordingSummaries.filter((recording) => {
+        const recordingDate = new Date(recording.createdAt);
+        return (
+          recordingDate.getMonth() === currentMonth &&
+          recordingDate.getFullYear() === currentYear
+        );
+      });
+
+      this.metrics.totalSummaries = monthlyRecordings.length;
+      this.metrics.totalMinutes = Math.round(
+        monthlyRecordings.reduce((acc, recording) => {
+          return acc + (recording.audioDuration || 0);
+        }, 0) / 60,
+      );
     },
   },
 });

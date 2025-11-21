@@ -600,17 +600,6 @@ onMounted(() => {
   refreshRecordings();
 });
 
-// Watch para refrescar automáticamente
-watch(
-  () => recordingStore.recordingSummaries,
-  (newVal, oldVal) => {
-    if (newVal.length !== oldVal?.length) {
-      // Scroll suave hacia arriba cuando hay nuevos recordings
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  },
-);
-
 // Watch para cambios en sortBy
 watch(sortBy, async (newValue) => {
   if (newValue === "newest") {

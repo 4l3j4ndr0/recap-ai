@@ -56,7 +56,7 @@ onBeforeMount(async () => {
       const connectionState = payload.data.connectionState as ConnectionState;
       console.log(connectionState);
       if (connectionState === ConnectionState.Connected) {
-        await recordingSummary.getRecordingSummaries();
+        // await recordingSummary.getRecordingSummaries();
       }
     }
   });

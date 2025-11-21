@@ -1,5 +1,41 @@
 <template>
   <q-layout>
+    <!-- Dashboard Metrics -->
+    <!-- <div class="q-pa-md">
+      <div class="row q-col-gutter-md">
+        <div class="col-12 col-sm-6">
+          <q-card class="metric-card">
+            <q-card-section>
+              <div class="row items-center no-wrap">
+                <q-icon name="summarize" size="3rem" color="primary" class="q-mr-md" />
+                <div class="col">
+                  <div class="text-caption text-grey-6">{{ currentMonthYear }}</div>
+                  <div class="text-h4 text-weight-bold">{{ recordingSummary.metrics.totalSummaries }}</div>
+                  <div class="text-body2 text-grey-7">Total Summaries</div>
+                </div>
+              </div>
+            </q-card-section>
+          </q-card>
+        </div>
+
+        <div class="col-12 col-sm-6">
+          <q-card class="metric-card">
+            <q-card-section>
+              <div class="row items-center no-wrap">
+                <q-icon name="schedule" size="3rem" color="secondary" class="q-mr-md" />
+                <div class="col">
+                  <div class="text-caption text-grey-6">{{ currentMonthYear }}</div>
+                  <div class="text-h4 text-weight-bold">{{ recordingSummary.metrics.totalMinutes }}</div>
+                  <div class="text-body2 text-grey-7">Total Minutes</div>
+                </div>
+              </div>
+            </q-card-section>
+          </q-card>
+        </div>
+      </div>
+    </div> -->
+
+    <!-- Recording Actions -->
     <div class="q-pa-md">
       <div class="row q-gutter-md justify-center">
         <RecordingButton
@@ -11,12 +47,14 @@
         <FileUploadButton />
       </div>
     </div>
+
     <!-- Lista de recordings -->
     <RecordingSummaryList />
   </q-layout>
 </template>
 
 <script setup lang="ts">
+import { onMounted, computed } from "vue";
 import { useGeneralStore } from "../../src/stores/General";
 import { useUserStore } from "../../src/stores/User";
 import RecordingButton from "../components/RecordingButton.vue";
@@ -35,6 +73,15 @@ import mixin from "../mixins/mixin";
 
 const { showNoty, showLoading, hideLoading } = mixin();
 
+const currentMonthYear = computed(() => {
+  const now = new Date();
+  return now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+});
+
+onMounted(() => {
+  recordingSummary.calculateMonthlyMetrics();
+});
+
 const client = generateClient<Schema>();
 client.models.RecordingSummary.onCreate({
   filter: {
@@ -43,8 +90,9 @@ client.models.RecordingSummary.onCreate({
   authMode: "userPool",
 }).subscribe({
   next: (data) => {
-    // console.log("New recording summary created:", data);
-    recordingSummary.getRecordingSummaries();
+    recordingSummary.getRecordingSummaries().then(() => {
+      recordingSummary.calculateMonthlyMetrics();
+    });
   },
   error: (error) => console.warn(error),
 });
@@ -56,8 +104,8 @@ client.models.RecordingSummary.onUpdate({
   authMode: "userPool",
 }).subscribe({
   next: (data) => {
-    // console.log("New recording summary updated:", data);
     recordingSummary.updateRecordyngSummaryListener(data);
+    recordingSummary.calculateMonthlyMetrics();
   },
   error: (error) => console.warn(error),
 });
@@ -109,4 +157,13 @@ defineOptions({
 });
 </script>
 
-<style scoped></style>
+<style scoped>
+.metric-card {
+  border-radius: 8px;
+  transition: transform 0.2s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+}
+</style>

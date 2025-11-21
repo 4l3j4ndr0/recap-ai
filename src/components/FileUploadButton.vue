@@ -23,6 +23,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { uploadData } from "@aws-amplify/storage";
+//@ts-ignore
 import { useQuasar } from "quasar";
 import { useRecordingSummaryStore } from "../stores/RecordingSumary";
 import { useUserStore } from "../stores/User";
@@ -36,12 +37,12 @@ const selectedFile = ref<File | null>(null);
 
 const onRejected = (rejectedEntries: any[]) => {
   rejectedEntries.forEach((entry) => {
-    if (entry.failedPropValidation === 'max-file-size') {
+    if (entry.failedPropValidation === "max-file-size") {
       $q.notify({
         type: "negative",
         message: "El archivo es muy grande. Máximo 2GB.",
       });
-    } else if (entry.failedPropValidation === 'accept') {
+    } else if (entry.failedPropValidation === "accept") {
       $q.notify({
         type: "negative",
         message: "Formato no soportado.",
@@ -58,7 +59,7 @@ const handleFileSelect = async (file: File | null) => {
   try {
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const fileName = `upload-${timestamp}-${file.name}`;
-    
+
     const path = `users-recordings/${userStore.userId}/${new Date().getFullYear()}/${
       new Date().getMonth() + 1
     }/${fileName}`;
